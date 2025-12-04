@@ -4,12 +4,16 @@ from datetime import datetime
 from dotenv import load_dotenv
 import os
 
-# Load environment variables from .env file
+# Load environment variables from .env file (for local development)
+# Note: In GitHub Actions, secrets are passed as environment variables
+# and will take precedence over .env file values
 load_dotenv()
 
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
+# Get API keys and webhook URL from environment variables
+# These are set from GitHub Secrets in CI/CD, or from .env file locally
 DOMO_WEBHOOK_URL = os.getenv(
     "DOMO_WEBHOOK_URL",
     "https://stoagroup.domo.com/api/iot/v1/webhook/data/eyJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NjQ4NzAzNzUsInN0cmVhbSI6IjkyNDE0M2Q4NGY4NzRmMTZiYzU3MWQ1OWY5NTc5Y2FiOm1tbW0tMDA0NC0wNTc0OjUyMzIwNTM5NSJ9.zK49RWVpC4DDCIF6gHHOYY1LcwZ2CGqef_PJCiwsDUk"
@@ -18,6 +22,16 @@ DOMO_WEBHOOK_URL = os.getenv(
 FRED_API_KEY = os.getenv("FRED_API_KEY")
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 METALS_API_KEY = os.getenv("METALS_API_KEY")
+
+# Validate that required secrets are available (for GitHub Actions)
+if not FRED_API_KEY:
+    print("Warning: FRED_API_KEY not found in environment variables")
+if not FMP_API_KEY:
+    print("Warning: FMP_API_KEY not found in environment variables")
+if not METALS_API_KEY:
+    print("Warning: METALS_API_KEY not found in environment variables")
+if not DOMO_WEBHOOK_URL:
+    print("Warning: DOMO_WEBHOOK_URL not found in environment variables")
 
 today = datetime.now().strftime("%Y-%m-%d")
 
