@@ -1,0 +1,45 @@
+[
+  {
+    "material": "lumber",
+    "source": "CME Futures (LB)",
+    "date": "2024-01-15",
+    "value": 450.25
+  },
+  {
+    "material": "copper",
+    "source": "COMEX Copper (HG)",
+    "date": "2024-01-15",
+    "value": 3.85
+  },
+  {
+    "material": "aluminum",
+    "source": "LME Aluminum (metals-api)",
+    "date": "2024-01-15",
+    "value": 2200.50
+  },
+  {
+    "material": "steel",
+    "source": "Steel Index (metals-api)",
+    "date": "2024-01-15",
+    "value": 850.75
+  },
+  {
+    "material": "cement",
+    "source": "US PPI",
+    "date": "2024-01-15",
+    "value": 125.3
+  },
+  {
+    "material": "pvc",
+    "source": "US PPI",
+    "date": "2024-01-15",
+    "value": 142.8
+  },
+  {
+    "material": "gypsum",
+    "source": "US PPI",
+    "date": "2024-01-15",
+    "value": 118.6
+  }
+]
+

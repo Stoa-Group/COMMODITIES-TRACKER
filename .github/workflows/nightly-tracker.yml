@@ -1,0 +1,33 @@
+name: Nightly Commodities Tracker
+
+on:
+  schedule:
+    # Run daily at 2:00 AM UTC (adjust timezone as needed)
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  track-commodities:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+    
+    - name: Run commodities tracker
+      env:
+        FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+        METALS_API_KEY: ${{ secrets.METALS_API_KEY }}
+      run: |
+        python commodities_tracker.py
+
