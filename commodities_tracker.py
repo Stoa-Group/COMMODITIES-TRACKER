@@ -35,11 +35,12 @@ def fetch_metals():
         print("Warning: METALS_API_KEY not found, skipping metals fetch")
         return {"aluminum": None, "copper": None, "steel": None}
     
-    # Try multiple symbol formats - Metals-API may use different symbols
-    # Common formats: XAL (Aluminum), XCU (Copper), or LME symbols
+    # Metals-API uses LME (London Metal Exchange) symbols
+    # Prices are per troy ounce - need to convert to metric ton
+    # LME-ALU = Aluminum, LME-XCU = Copper
     url = (
         f"https://metals-api.com/api/latest?"
-        f"access_key={METALS_API_KEY}&base=USD&symbols=XAL,XCU"
+        f"access_key={METALS_API_KEY}&base=USD&symbols=LME-ALU,LME-XCU"
     )
     
     try:
@@ -56,21 +57,20 @@ def fetch_metals():
         rates = data.get("rates", {})
         print(f"Metals-API Rates: {rates}")
         
-        # Try multiple possible symbol formats
-        # XAL = Aluminum, XCU = Copper
-        # Also check for ALUMINUM, COPPER, STEEL in case API uses those
+        # Metals-API returns prices per troy ounce
+        # Convert to metric ton: 1 metric ton = 32,150.7 troy ounces
+        TROY_OUNCES_PER_METRIC_TON = 32150.7
+        
+        # Extract prices and convert to metric tons
+        aluminum_per_oz = rates.get("LME-ALU") or rates.get("ALUMINUM")
+        copper_per_oz = rates.get("LME-XCU") or rates.get("COPPER")
+        
         result = {
-            "aluminum": (
-                float(rates.get("XAL")) if rates.get("XAL") else
-                float(rates.get("ALUMINUM")) if rates.get("ALUMINUM") else None
-            ),
-            "copper": (
-                float(rates.get("XCU")) if rates.get("XCU") else
-                float(rates.get("COPPER")) if rates.get("COPPER") else None
-            ),
-            "steel": float(rates.get("STEEL")) if rates.get("STEEL") else None
+            "aluminum": float(aluminum_per_oz) * TROY_OUNCES_PER_METRIC_TON if aluminum_per_oz else None,
+            "copper": float(copper_per_oz) * TROY_OUNCES_PER_METRIC_TON if copper_per_oz else None,
+            "steel": None  # Steel not available through Metals-API LME symbols
         }
-        print(f"Metals-API Parsed Values: {result}")
+        print(f"Metals-API Parsed Values (converted to metric tons): {result}")
         return result
     except Exception as e:
         print(f"Metals-API exception: {str(e)}")
@@ -179,52 +179,82 @@ def build_payload():
     lumber_price = fetch_lumber_futures()
     
     # Metals - Base Metals subcategory
-    # Note: Steel may not be available through Metals-API
-    metal_mapping = {
-        "aluminum": {"name": "Aluminum", "unit": "USD per metric ton"},
-        "copper": {"name": "Copper", "unit": "USD per metric ton"},
-        "steel": {"name": "Steel", "unit": "USD per metric ton"}  # May not be available
-    }
-    
-    for metal_key, metal_info in metal_mapping.items():
+    # Only add Aluminum and Copper if we have values from Metals-API
+    if metals.get("aluminum") is not None:
         payload.append({
             "material": "metal",
             "subcategory": "Base Metals",
-            "product": metal_info["name"],
+            "product": "Aluminum",
             "date": today,
-            "value": metals.get(metal_key),
-            "unit": metal_info["unit"],
+            "value": metals.get("aluminum"),
+            "unit": "USD per metric ton",
             "source": "Metals-API"
         })
     
-    # Lumber Futures - CME Futures subcategory
-    payload.append({
-        "material": "lumber",
-        "subcategory": "CME Futures",
-        "product": "LB",
-        "date": today,
-        "value": lumber_price,
-        "unit": "USD per 1000 board feet",
-        "source": "FMP"
-    })
+    if metals.get("copper") is not None:
+        payload.append({
+            "material": "metal",
+            "subcategory": "Base Metals",
+            "product": "Copper",
+            "date": today,
+            "value": metals.get("copper"),
+            "unit": "USD per metric ton",
+            "source": "Metals-API"
+        })
+    
+    # Lumber - Try FMP first, fallback to FRED PPI if FMP fails
+    if lumber_price is not None:
+        payload.append({
+            "material": "lumber",
+            "subcategory": "CME Futures",
+            "product": "LB",
+            "date": today,
+            "value": lumber_price,
+            "unit": "USD per 1000 board feet",
+            "source": "FMP"
+        })
+    else:
+        # Fallback to FRED Softwood Lumber PPI
+        lumber_ppi = fetch_fred_series("WPU08110701")
+        if lumber_ppi is not None:
+            payload.append({
+                "material": "lumber",
+                "subcategory": "PPI",
+                "product": "Softwood Lumber",
+                "date": today,
+                "value": lumber_ppi,
+                "unit": "Index (base year = 100)",
+                "source": "FRED"
+            })
     
     # Construction Commodities - PPI subcategory
-    # Note: PVC and Gypsum series IDs may need verification - these might not exist
     # Cement series ID is confirmed working: PCU3274203274201
     ppi_series = {
         "Cement": "PCU3274203274201",
-        # "PVC": "WPU06310209",  # Series doesn't exist - need to find correct ID
-        # "Gypsum": "PCU3274103274101",  # Series doesn't exist - need to find correct ID
     }
     
     for product_name, series_id in ppi_series.items():
         value = fetch_fred_series(series_id)
+        if value is not None:
+            payload.append({
+                "material": "construction",
+                "subcategory": "PPI",
+                "product": product_name,
+                "date": today,
+                "value": value,
+                "unit": "Index (base year = 100)",
+                "source": "FRED"
+            })
+    
+    # Steel - Use FRED PPI (Metals-API doesn't have steel)
+    steel_ppi = fetch_fred_series("PCU331331")  # Steel product manufacturing PPI
+    if steel_ppi is not None:
         payload.append({
-            "material": "construction",
+            "material": "metal",
             "subcategory": "PPI",
-            "product": product_name,
+            "product": "Steel",
             "date": today,
-            "value": value,
+            "value": steel_ppi,
             "unit": "Index (base year = 100)",
             "source": "FRED"
         })
