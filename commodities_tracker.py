@@ -24,14 +24,24 @@ FMP_API_KEY = os.getenv("FMP_API_KEY")
 METALS_API_KEY = os.getenv("METALS_API_KEY")
 
 # Validate that required secrets are available (for GitHub Actions)
+missing_secrets = []
 if not FRED_API_KEY:
-    print("Warning: FRED_API_KEY not found in environment variables")
+    missing_secrets.append("FRED_API_KEY")
+    print("[ERROR] FRED_API_KEY not found in environment variables")
 if not FMP_API_KEY:
-    print("Warning: FMP_API_KEY not found in environment variables")
+    missing_secrets.append("FMP_API_KEY")
+    print("[ERROR] FMP_API_KEY not found in environment variables")
 if not METALS_API_KEY:
-    print("Warning: METALS_API_KEY not found in environment variables")
-if not DOMO_WEBHOOK_URL:
-    print("Warning: DOMO_WEBHOOK_URL not found in environment variables")
+    missing_secrets.append("METALS_API_KEY")
+    print("[ERROR] METALS_API_KEY not found in environment variables")
+if not DOMO_WEBHOOK_URL or DOMO_WEBHOOK_URL == "***":
+    missing_secrets.append("DOMO_WEBHOOK_URL")
+    print("[ERROR] DOMO_WEBHOOK_URL not found in environment variables")
+
+if missing_secrets:
+    print(f"\n[WARNING] Missing required secrets: {', '.join(missing_secrets)}")
+    print("Please ensure these are set in GitHub Secrets or .env file")
+    print("The script will continue but may not be able to fetch data.")
 
 today = datetime.now().strftime("%Y-%m-%d")
 
@@ -312,7 +322,15 @@ def push_to_domo(payload):
     Headers: Content-Type: application/json
     Push mode: full replace
     """
-    print(f"Uploading {len(payload)} records to Domo…")
+    if not DOMO_WEBHOOK_URL or DOMO_WEBHOOK_URL == "***":
+        print("[ERROR] DOMO_WEBHOOK_URL is not set. Cannot send data to Domo.")
+        return False
+    
+    if not payload or len(payload) == 0:
+        print("[WARNING] No data to send to Domo (empty payload)")
+        return False
+    
+    print(f"Uploading {len(payload)} records to Domo...")
     
     headers = {"Content-Type": "application/json"}
     
@@ -328,13 +346,13 @@ def push_to_domo(payload):
         print(f"Response: {response.text}")
         
         if response.status_code == 200:
-            print("✓ Successfully sent data to Domo")
+            print("[SUCCESS] Successfully sent data to Domo")
             return True
         else:
-            print(f"✗ Failed to send data to Domo (Status: {response.status_code})")
+            print(f"[ERROR] Failed to send data to Domo (Status: {response.status_code})")
             return False
     except Exception as e:
-        print(f"✗ Exception sending to Domo: {str(e)}")
+        print(f"[ERROR] Exception sending to Domo: {str(e)}")
         return False
 
 
@@ -391,11 +409,20 @@ def main():
     
     if success:
         print("=" * 60)
-        print("✓ Process completed successfully")
+        print("[SUCCESS] Process completed successfully")
     else:
         print("=" * 60)
-        print("✗ Process completed with errors")
-        exit(1)
+        if len(payload) == 0:
+            print("[ERROR] Process failed: No data collected (check API keys)")
+            print("Verify that FRED_API_KEY, FMP_API_KEY, and METALS_API_KEY are valid")
+            exit(1)
+        elif not DOMO_WEBHOOK_URL or DOMO_WEBHOOK_URL == "***":
+            print("[ERROR] Process failed: DOMO_WEBHOOK_URL not configured")
+            exit(1)
+        else:
+            print("[WARNING] Process completed with warnings (some data may not have been sent)")
+            # Don't exit with error if we have data but Domo send failed
+            # This allows the workflow to continue even if Domo is temporarily unavailable
 
 
 if __name__ == "__main__":
