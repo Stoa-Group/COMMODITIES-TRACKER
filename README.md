@@ -1,15 +1,30 @@
 # Commodities Tracker
 
-Automated daily tracking of commodity prices and PPI data, sent to Domo via webhook.
+Automated daily tracking of commodity prices, metals, futures, PPIs, and all Random Lengths wood products, sent to Domo via webhook.
 
 ## Overview
 
-This script collects commodity pricing data from multiple sources:
-- **Futures**: Lumber (LB), Copper (HG) via Financial Modeling Prep
-- **Metals**: Aluminum, Steel via Metals-API (optional)
-- **PPI Data**: Cement, PVC, Gypsum via FRED (Federal Reserve Economic Data)
+This script collects commodity pricing data from multiple sources and includes all Random Lengths wood products:
 
-Data is automatically sent to Domo as a clean JSON array on a nightly schedule.
+- **Metals**: Aluminum, Copper, Steel via Metals-API
+- **Futures**: Lumber (LB) via Financial Modeling Prep
+- **PPI Data**: Cement, PVC, Gypsum via FRED (Federal Reserve Economic Data)
+- **Random Lengths Wood Products**: All 40+ wood products (Framing Lumber, Panels, Engineered Wood, Cedar, Softwood Boards, Specialty) with value=None (to be populated later)
+
+## Data Structure
+
+Each record follows this unified format:
+
+```json
+{
+  "material": "metal | lumber | wood | construction",
+  "subcategory": "Base Metals | CME Futures | PPI | Framing Lumber | Panels | Engineered Wood | Cedar | Softwood Boards | Specialty",
+  "product": "Aluminum | LB | Douglas Fir KD | Cement etc.",
+  "date": "YYYY-MM-DD",
+  "value": 123.45,
+  "source": "Metals-API | FMP | FRED | RandomLengths"
+}
+```
 
 ## Setup
 
@@ -17,26 +32,33 @@ Data is automatically sent to Domo as a clean JSON array on a nightly schedule.
 
 - **FRED API Key**: Free at https://fred.stlouisfed.org/docs/api/api_key.html
 - **FMP API Key**: Get from https://financialmodelingprep.com (free tier available)
-- **Metals API Key**: Optional, from https://metals-api.com
+- **Metals API Key**: Get from https://metals-api.com
 
-### 2. Configure GitHub Secrets
+### 2. Configure Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+FRED_API_KEY=your_fred_key_here
+FMP_API_KEY=your_fmp_key_here
+METALS_API_KEY=your_metals_key_here
+DOMO_WEBHOOK_URL=https://stoagroup.domo.com/api/iot/v1/webhook/data/...
+```
+
+### 3. Configure GitHub Secrets
 
 In your GitHub repository, go to Settings → Secrets and variables → Actions, and add:
 
 - `FRED_API_KEY`: Your FRED API key
 - `FMP_API_KEY`: Your Financial Modeling Prep API key
-- `METALS_API_KEY`: Your Metals-API key (optional, leave empty if not using)
+- `METALS_API_KEY`: Your Metals-API key
+- `DOMO_WEBHOOK_URL`: Your Domo webhook URL (optional, defaults to hardcoded URL)
 
-### 3. Local Testing
+### 4. Local Testing
 
 ```bash
 # Install dependencies
 pip install -r requirements.txt
-
-# Set environment variables (Windows PowerShell)
-$env:FRED_API_KEY="your_key_here"
-$env:FMP_API_KEY="your_key_here"
-$env:METALS_API_KEY="your_key_here"  # Optional
 
 # Run the script
 python commodities_tracker.py
@@ -48,25 +70,27 @@ The workflow runs automatically every night at 2:00 AM UTC via GitHub Actions. Y
 
 ## Output Format
 
-The script sends a JSON array to Domo with the following structure:
+The script sends a JSON array to Domo with all commodities and wood products. See `sample_output.json` for an example.
 
-```json
-[
-  {
-    "material": "lumber",
-    "source": "CME Futures (LB)",
-    "date": "2024-01-15",
-    "value": 450.25
-  },
-  {
-    "material": "copper",
-    "source": "COMEX Copper (HG)",
-    "date": "2024-01-15",
-    "value": 3.85
-  },
-  ...
-]
-```
+## Functions
+
+The module implements the following functions as specified:
+
+- `fetch_metals()`: Fetches Aluminum, Copper, Steel in one API call
+- `fetch_lumber_futures()`: Fetches LB futures price
+- `fetch_fred_series(series_id)`: Fetches latest PPI observation
+- `build_random_lengths_products()`: Builds all RL wood product entries
+- `build_payload()`: Assembles complete dataset
+- `push_to_domo(payload)`: Sends data to Domo webhook
+- `main()`: Main execution function
+
+## Error Handling
+
+- Metals-API failures are logged and return None values
+- FMP missing symbols return None
+- FRED missing observations return None
+- Domo response codes are printed/logged
+- Execution continues even if one source fails
 
 ## Files
 
@@ -74,4 +98,3 @@ The script sends a JSON array to Domo with the following structure:
 - `requirements.txt`: Python dependencies
 - `.github/workflows/nightly-tracker.yml`: GitHub Actions workflow configuration
 - `sample_output.json`: Example JSON output for testing
-

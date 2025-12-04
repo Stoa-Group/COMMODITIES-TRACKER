@@ -1,45 +1,90 @@
 [
   {
+    "material": "metal",
+    "subcategory": "Base Metals",
+    "product": "Aluminum",
+    "date": "2024-01-15",
+    "value": 2200.50,
+    "source": "Metals-API"
+  },
+  {
+    "material": "metal",
+    "subcategory": "Base Metals",
+    "product": "Copper",
+    "date": "2024-01-15",
+    "value": 3.85,
+    "source": "Metals-API"
+  },
+  {
+    "material": "metal",
+    "subcategory": "Base Metals",
+    "product": "Steel",
+    "date": "2024-01-15",
+    "value": 850.75,
+    "source": "Metals-API"
+  },
+  {
     "material": "lumber",
-    "source": "CME Futures (LB)",
+    "subcategory": "CME Futures",
+    "product": "LB",
     "date": "2024-01-15",
-    "value": 450.25
+    "value": 450.25,
+    "source": "FMP"
   },
   {
-    "material": "copper",
-    "source": "COMEX Copper (HG)",
+    "material": "construction",
+    "subcategory": "PPI",
+    "product": "Cement",
     "date": "2024-01-15",
-    "value": 3.85
+    "value": 125.3,
+    "source": "FRED"
   },
   {
-    "material": "aluminum",
-    "source": "LME Aluminum (metals-api)",
+    "material": "construction",
+    "subcategory": "PPI",
+    "product": "PVC",
     "date": "2024-01-15",
-    "value": 2200.50
+    "value": 142.8,
+    "source": "FRED"
   },
   {
-    "material": "steel",
-    "source": "Steel Index (metals-api)",
+    "material": "construction",
+    "subcategory": "PPI",
+    "product": "Gypsum",
     "date": "2024-01-15",
-    "value": 850.75
+    "value": 118.6,
+    "source": "FRED"
   },
   {
-    "material": "cement",
-    "source": "US PPI",
+    "material": "wood",
+    "subcategory": "Framing Lumber",
+    "product": "Douglas Fir Green",
     "date": "2024-01-15",
-    "value": 125.3
+    "value": null,
+    "source": "RandomLengths"
   },
   {
-    "material": "pvc",
-    "source": "US PPI",
+    "material": "wood",
+    "subcategory": "Framing Lumber",
+    "product": "Douglas Fir KD",
     "date": "2024-01-15",
-    "value": 142.8
+    "value": null,
+    "source": "RandomLengths"
   },
   {
-    "material": "gypsum",
-    "source": "US PPI",
+    "material": "wood",
+    "subcategory": "Panels",
+    "product": "OSB North Central",
     "date": "2024-01-15",
-    "value": 118.6
+    "value": null,
+    "source": "RandomLengths"
+  },
+  {
+    "material": "wood",
+    "subcategory": "Engineered Wood",
+    "product": "LVL",
+    "date": "2024-01-15",
+    "value": null,
+    "source": "RandomLengths"
   }
 ]
-
