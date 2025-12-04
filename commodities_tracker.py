@@ -35,14 +35,18 @@ def fetch_metals():
         print("Warning: METALS_API_KEY not found, skipping metals fetch")
         return {"aluminum": None, "copper": None, "steel": None}
     
+    # Try multiple symbol formats - Metals-API may use different symbols
+    # Common formats: XAL (Aluminum), XCU (Copper), or LME symbols
     url = (
         f"https://metals-api.com/api/latest?"
-        f"access_key={METALS_API_KEY}&base=USD&symbols=ALUMINUM,COPPER,STEEL"
+        f"access_key={METALS_API_KEY}&base=USD&symbols=XAL,XCU"
     )
     
     try:
         r = requests.get(url, timeout=10)
+        print(f"Metals-API Response Status: {r.status_code}")
         data = r.json()
+        print(f"Metals-API Response: {json.dumps(data, indent=2)[:500]}...")  # First 500 chars
         
         if not data.get("success", False):
             error_info = data.get("error", {}).get("info", "Unknown error")
@@ -50,14 +54,28 @@ def fetch_metals():
             return {"aluminum": None, "copper": None, "steel": None}
         
         rates = data.get("rates", {})
+        print(f"Metals-API Rates: {rates}")
         
-        return {
-            "aluminum": float(rates.get("ALUMINUM")) if rates.get("ALUMINUM") else None,
-            "copper": float(rates.get("COPPER")) if rates.get("COPPER") else None,
+        # Try multiple possible symbol formats
+        # XAL = Aluminum, XCU = Copper
+        # Also check for ALUMINUM, COPPER, STEEL in case API uses those
+        result = {
+            "aluminum": (
+                float(rates.get("XAL")) if rates.get("XAL") else
+                float(rates.get("ALUMINUM")) if rates.get("ALUMINUM") else None
+            ),
+            "copper": (
+                float(rates.get("XCU")) if rates.get("XCU") else
+                float(rates.get("COPPER")) if rates.get("COPPER") else None
+            ),
             "steel": float(rates.get("STEEL")) if rates.get("STEEL") else None
         }
+        print(f"Metals-API Parsed Values: {result}")
+        return result
     except Exception as e:
         print(f"Metals-API exception: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {"aluminum": None, "copper": None, "steel": None}
 
 
@@ -74,22 +92,28 @@ def fetch_lumber_futures():
     
     try:
         r = requests.get(url, timeout=10)
+        print(f"FMP API Response Status: {r.status_code}")
         if r.status_code != 200:
             print(f"FMP API error: Status {r.status_code}")
+            print(f"FMP API Response: {r.text[:500]}")
             return None
         
         data = r.json()
+        print(f"FMP API Response: {json.dumps(data, indent=2)[:500]}...")
         if not data or len(data) == 0:
             print("FMP API: Empty response for LB")
             return None
         
         price = data[0].get("price")
+        print(f"FMP API Parsed Price: {price}")
         if price is None:
             return None
         
         return float(price)
     except Exception as e:
         print(f"FMP API exception: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
@@ -108,18 +132,24 @@ def fetch_fred_series(series_id):
     
     try:
         r = requests.get(url, timeout=10)
+        print(f"FRED API Response Status for {series_id}: {r.status_code}")
         if r.status_code != 200:
             print(f"FRED API error for {series_id}: Status {r.status_code}")
+            print(f"FRED API Response: {r.text[:500]}")
             return None
         
-        data = r.json().get("observations", [])
-        if not data:
+        data = r.json()
+        observations = data.get("observations", [])
+        print(f"FRED API for {series_id}: Found {len(observations)} observations")
+        if not observations:
             print(f"FRED API: No observations for {series_id}")
             return None
         
-        # Last entry is most recent (sort_order=desc means first is latest, but we check all)
-        latest = data[0]  # First entry is latest with sort_order=desc
+        # First entry is latest with sort_order=desc
+        latest = observations[0]
         value = latest.get("value")
+        date = latest.get("date")
+        print(f"FRED API for {series_id}: Latest value on {date} = {value}")
         
         if value in ("", None, "."):
             return None
@@ -127,6 +157,8 @@ def fetch_fred_series(series_id):
         return float(value)
     except Exception as e:
         print(f"FRED API exception for {series_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
@@ -147,19 +179,21 @@ def build_payload():
     lumber_price = fetch_lumber_futures()
     
     # Metals - Base Metals subcategory
+    # Note: Steel may not be available through Metals-API
     metal_mapping = {
-        "aluminum": "Aluminum",
-        "copper": "Copper",
-        "steel": "Steel"
+        "aluminum": {"name": "Aluminum", "unit": "USD per metric ton"},
+        "copper": {"name": "Copper", "unit": "USD per metric ton"},
+        "steel": {"name": "Steel", "unit": "USD per metric ton"}  # May not be available
     }
     
-    for metal_key, metal_name in metal_mapping.items():
+    for metal_key, metal_info in metal_mapping.items():
         payload.append({
             "material": "metal",
             "subcategory": "Base Metals",
-            "product": metal_name,
+            "product": metal_info["name"],
             "date": today,
             "value": metals.get(metal_key),
+            "unit": metal_info["unit"],
             "source": "Metals-API"
         })
     
@@ -170,14 +204,17 @@ def build_payload():
         "product": "LB",
         "date": today,
         "value": lumber_price,
+        "unit": "USD per 1000 board feet",
         "source": "FMP"
     })
     
     # Construction Commodities - PPI subcategory
+    # Note: PVC and Gypsum series IDs may need verification - these might not exist
+    # Cement series ID is confirmed working: PCU3274203274201
     ppi_series = {
         "Cement": "PCU3274203274201",
-        "PVC": "WPU06310209",
-        "Gypsum": "PCU3274103274101"
+        # "PVC": "WPU06310209",  # Series doesn't exist - need to find correct ID
+        # "Gypsum": "PCU3274103274101",  # Series doesn't exist - need to find correct ID
     }
     
     for product_name, series_id in ppi_series.items():
@@ -188,6 +225,7 @@ def build_payload():
             "product": product_name,
             "date": today,
             "value": value,
+            "unit": "Index (base year = 100)",
             "source": "FRED"
         })
     

@@ -5,6 +5,7 @@
     "product": "Aluminum",
     "date": "2024-01-15",
     "value": 2200.50,
+    "unit": "USD per metric ton",
     "source": "Metals-API"
   },
   {
@@ -13,6 +14,7 @@
     "product": "Copper",
     "date": "2024-01-15",
     "value": 3.85,
+    "unit": "USD per metric ton",
     "source": "Metals-API"
   },
   {
@@ -21,6 +23,7 @@
     "product": "Steel",
     "date": "2024-01-15",
     "value": 850.75,
+    "unit": "USD per metric ton",
     "source": "Metals-API"
   },
   {
@@ -29,6 +32,7 @@
     "product": "LB",
     "date": "2024-01-15",
     "value": 450.25,
+    "unit": "USD per 1000 board feet",
     "source": "FMP"
   },
   {
@@ -37,22 +41,7 @@
     "product": "Cement",
     "date": "2024-01-15",
     "value": 125.3,
-    "source": "FRED"
-  },
-  {
-    "material": "construction",
-    "subcategory": "PPI",
-    "product": "PVC",
-    "date": "2024-01-15",
-    "value": 142.8,
-    "source": "FRED"
-  },
-  {
-    "material": "construction",
-    "subcategory": "PPI",
-    "product": "Gypsum",
-    "date": "2024-01-15",
-    "value": 118.6,
+    "unit": "Index (base year = 100)",
     "source": "FRED"
   }
 ]
