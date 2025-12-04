@@ -228,10 +228,39 @@ def build_payload():
             })
     
     # Construction Commodities - PPI subcategory
-    # Cement series ID is confirmed working: PCU3274203274201
+    # Cement series ID: PCU3274203274201
+    # Note: Gypsum also uses PCU3274203274201 (same as Cement - Cement Manufacturing PPI)
     ppi_series = {
         "Cement": "PCU3274203274201",
     }
+    
+    # PVC - Resin / PVC product price/trend
+    # Using WPU072106033 as specified
+    pvc_value = fetch_fred_series("WPU072106033")
+    if pvc_value is not None:
+        payload.append({
+            "material": "construction",
+            "subcategory": "PPI",
+            "product": "PVC",
+            "date": today,
+            "value": pvc_value,
+            "unit": "Index (base year = 100)",
+            "source": "FRED"
+        })
+    
+    # Gypsum - Gypsum product manufacturing price/trend
+    # Using PCU3274203274201 as specified
+    gypsum_value = fetch_fred_series("PCU3274203274201")
+    if gypsum_value is not None:
+        payload.append({
+            "material": "construction",
+            "subcategory": "PPI",
+            "product": "Gypsum",
+            "date": today,
+            "value": gypsum_value,
+            "unit": "Index (base year = 100)",
+            "source": "FRED"
+        })
     
     for product_name, series_id in ppi_series.items():
         value = fetch_fred_series(series_id)
