@@ -23,60 +23,6 @@ today = datetime.now().strftime("%Y-%m-%d")
 
 
 # ------------------------------------------------
-# RANDOM LENGTHS PRODUCT DEFINITIONS
-# ------------------------------------------------
-RANDOM_LENGTHS_PRODUCTS = {
-    "Framing Lumber": [
-        "Douglas Fir Green",
-        "Douglas Fir KD",
-        "Hem-Fir Green",
-        "Hem-Fir KD",
-        "SPF East",
-        "SPF West",
-        "Southern Yellow Pine #2",
-        "Southern Yellow Pine #1",
-        "Southern Yellow Pine #2 & Better",
-        "SYP KD",
-        "Studs"
-    ],
-    "Panels": [
-        "OSB North Central",
-        "OSB Southeast",
-        "OSB Western",
-        "Plywood Southern Pine",
-        "Plywood Western Fir",
-        "Plywood 3/8\"",
-        "Plywood 15/32\"",
-        "Plywood 23/32\"",
-        "Underlayment Panels"
-    ],
-    "Engineered Wood": [
-        "LVL",
-        "LSL",
-        "PSL",
-        "I-Joists",
-        "Glulam Beams"
-    ],
-    "Cedar": [
-        "Western Red Cedar Decking",
-        "Western Red Cedar Boards",
-        "Western Red Cedar Fence Pickets"
-    ],
-    "Softwood Boards": [
-        "Ponderosa Pine Boards",
-        "Radiata Pine Boards",
-        "Eastern White Pine Boards"
-    ],
-    "Specialty": [
-        "Treated Southern Yellow Pine",
-        "Industrial Lumber",
-        "Shingles",
-        "Shakes"
-    ]
-}
-
-
-# ------------------------------------------------
 # API FETCH FUNCTIONS
 # ------------------------------------------------
 def fetch_metals():
@@ -187,33 +133,11 @@ def fetch_fred_series(series_id):
 # ------------------------------------------------
 # DATA BUILDING FUNCTIONS
 # ------------------------------------------------
-def build_random_lengths_products():
-    """
-    Loops the full RL wood list
-    Creates output rows with value=None
-    """
-    rows = []
-    
-    for subcategory, products in RANDOM_LENGTHS_PRODUCTS.items():
-        for product in products:
-            rows.append({
-                "material": "wood",
-                "subcategory": subcategory,
-                "product": product,
-                "date": today,
-                "value": None,
-                "source": "RandomLengths"
-            })
-    
-    return rows
-
-
 def build_payload():
     """
     Converts metals → structured rows
     Converts lumber futures → structured row
     Converts FRED values → structured rows
-    Appends all RL rows
     Final output is a list of dicts, JSON-serializable
     """
     payload = []
@@ -266,10 +190,6 @@ def build_payload():
             "value": value,
             "source": "FRED"
         })
-    
-    # Random Lengths products (all with value=None)
-    rl_products = build_random_lengths_products()
-    payload.extend(rl_products)
     
     return payload
 
@@ -335,6 +255,24 @@ def main():
     records_with_values = sum(1 for r in payload if r.get("value") is not None)
     print(f"  Records with values: {records_with_values}")
     print(f"  Records with null values: {len(payload) - records_with_values}")
+    
+    # Show sample of records with values
+    records_with_data = [r for r in payload if r.get("value") is not None]
+    if records_with_data:
+        print(f"\nSample records with values:")
+        for record in records_with_data[:5]:  # Show first 5
+            print(f"  - {record.get('product')} ({record.get('subcategory')}): {record.get('value')}")
+    
+    # Show records without values
+    records_without_data = [r for r in payload if r.get("value") is None]
+    if records_without_data:
+        print(f"\nRecords without values (API errors):")
+        for record in records_without_data[:5]:  # Show first 5
+            print(f"  - {record.get('product')} ({record.get('subcategory')}): value=None")
+    
+    # Print full JSON for debugging (first 3 records)
+    print(f"\nFirst 3 records (JSON format):")
+    print(json.dumps(payload[:3], indent=2))
     
     # Push to Domo
     print("\n" + "=" * 60)

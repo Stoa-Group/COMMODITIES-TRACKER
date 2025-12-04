@@ -54,37 +54,5 @@
     "date": "2024-01-15",
     "value": 118.6,
     "source": "FRED"
-  },
-  {
-    "material": "wood",
-    "subcategory": "Framing Lumber",
-    "product": "Douglas Fir Green",
-    "date": "2024-01-15",
-    "value": null,
-    "source": "RandomLengths"
-  },
-  {
-    "material": "wood",
-    "subcategory": "Framing Lumber",
-    "product": "Douglas Fir KD",
-    "date": "2024-01-15",
-    "value": null,
-    "source": "RandomLengths"
-  },
-  {
-    "material": "wood",
-    "subcategory": "Panels",
-    "product": "OSB North Central",
-    "date": "2024-01-15",
-    "value": null,
-    "source": "RandomLengths"
-  },
-  {
-    "material": "wood",
-    "subcategory": "Engineered Wood",
-    "product": "LVL",
-    "date": "2024-01-15",
-    "value": null,
-    "source": "RandomLengths"
   }
 ]

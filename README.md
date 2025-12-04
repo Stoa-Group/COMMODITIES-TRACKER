@@ -4,12 +4,11 @@ Automated daily tracking of commodity prices, metals, futures, PPIs, and all Ran
 
 ## Overview
 
-This script collects commodity pricing data from multiple sources and includes all Random Lengths wood products:
+This script collects commodity pricing data from multiple sources:
 
 - **Metals**: Aluminum, Copper, Steel via Metals-API
 - **Futures**: Lumber (LB) via Financial Modeling Prep
 - **PPI Data**: Cement, PVC, Gypsum via FRED (Federal Reserve Economic Data)
-- **Random Lengths Wood Products**: All 40+ wood products (Framing Lumber, Panels, Engineered Wood, Cedar, Softwood Boards, Specialty) with value=None (to be populated later)
 
 ## Data Structure
 
@@ -22,7 +21,7 @@ Each record follows this unified format:
   "product": "Aluminum | LB | Douglas Fir KD | Cement etc.",
   "date": "YYYY-MM-DD",
   "value": 123.45,
-  "source": "Metals-API | FMP | FRED | RandomLengths"
+  "source": "Metals-API | FMP | FRED"
 }
 ```
 
@@ -79,8 +78,7 @@ The module implements the following functions as specified:
 - `fetch_metals()`: Fetches Aluminum, Copper, Steel in one API call
 - `fetch_lumber_futures()`: Fetches LB futures price
 - `fetch_fred_series(series_id)`: Fetches latest PPI observation
-- `build_random_lengths_products()`: Builds all RL wood product entries
-- `build_payload()`: Assembles complete dataset
+- `build_payload()`: Assembles complete dataset from API sources
 - `push_to_domo(payload)`: Sends data to Domo webhook
 - `main()`: Main execution function
 
