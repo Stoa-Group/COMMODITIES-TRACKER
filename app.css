@@ -3431,3 +3431,46 @@
   }
 }
   
+
+/* === Apple-like UI polish === */
+:root {
+  --card-radius: 16px;
+  --card-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  --card-border: rgba(15, 23, 42, 0.08);
+}
+
+.kpi-card, .kpi, .metric-card, .panel, .card {
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--card-border);
+  background: #fff;
+}
+
+.kpi-value, .metric-value {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.kpi-label, .metric-label, .panel-title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.property-header h2,
+.detail-title,
+.page-title {
+  letter-spacing: -0.01em;
+}
+
+/* Smaller screens: tighter cards + cleaner layout */
+@media (max-width: 900px) {
+  .kpi-card, .kpi, .metric-card, .panel, .card {
+    border-radius: 14px;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  }
+
+  .kpi-value, .metric-value {
+    font-size: clamp(18px, 5.5vw, 26px);
+  }
+}
