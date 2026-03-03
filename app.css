@@ -1,63 +1,86 @@
 /* ===========================
-   STOA Commodities Tracker - Advanced UI Theme
-   Apple-level design with Meta-level analytics
+   STOA Commodities Tracker - Aligned with Leasing Velocity & Deal Pipeline
    =========================== */
-   :root{
-    /* STOA Brand Colors */
-    --brand-green:   #7e8a6b;
-    --brand-green2:  #a6ad8a;
-    --brand-grey:    #757270;
-    --brand-blue:    #bdc2ce;
-    --brand-grey2:   #efeff1;
-    --brand-black:   #333333;
-  
+:root {
+    /* Stoa Group Brand (LDP + Banking + Leasing parity) */
+    --primary-green: #7e8a6b;
+    --primary-grey: #757270;
+    --secondary-green: #a6ad8a;
+    --secondary-black: #333333;
+    --secondary-blue: #bdc2ce;
+    --secondary-grey: #efeff1;
+    --white: #ffffff;
+
     /* UI Colors */
-    --bg:           #f8f9fa;
-    --card:         #ffffff;
-    --ink:          var(--brand-black);
-    --muted:        #6e746b;
-    --line:         #e5e7eb;
-    --chip:         #f3f4f6;
-    --chip-line:    #d1d5db;
-  
-    --accent:       var(--brand-green2);
-    --accent-ink:   #203019;
-    
-    /* Status Colors */
-    --success:      #10b981;
-    --warning:      #f59e0b;
-    --error:        #ef4444;
-    --info:         #3b82f6;
-  
-    /* Shadows - Apple-style depth */
-    --shadow-1: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
-    --shadow-2: 0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -1px rgba(0,0,0,.06);
+    --bg-primary: #ffffff;
+    --bg-secondary: #f5f5f5;
+    --border-color: #e5e7eb;
+    --text-primary: #1f2937;
+    --text-secondary: #6b7280;
+    --hover-bg: #f9fafb;
+
+    /* Backward-compat aliases (existing app.js / selectors) */
+    --brand-green: var(--primary-green);
+    --brand-green2: var(--secondary-green);
+    --brand-grey: var(--primary-grey);
+    --brand-blue: var(--secondary-blue);
+    --brand-grey2: var(--secondary-grey);
+    --brand-black: var(--secondary-black);
+    --bg: var(--bg-secondary);
+    --card: var(--bg-primary);
+    --ink: var(--text-primary);
+    --muted: var(--text-secondary);
+    --line: var(--border-color);
+    --chip: var(--hover-bg);
+    --chip-line: var(--border-color);
+    --accent: var(--primary-green);
+    --accent-hover: #6b7a5a;
+    --accent-ink: #1f2937;
+
+    /* Shadows — LDP/Banking (green-tinted) */
+    --shadow-1: 0 2px 4px rgba(126, 138, 107, 0.1);
+    --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow: var(--shadow-1);
     --shadow-3: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05);
     --shadow-4: 0 20px 25px -5px rgba(0,0,0,.1), 0 10px 10px -5px rgba(0,0,0,.04);
-  
-    /* Border Radius - Apple-style rounded */
-    --radius-sm: 8px;
-    --radius: 12px;
-    --radius-lg: 16px;
-    --radius-xl: 20px;
+
+    /* Radius — LDP/Banking (8px) */
+    --radius: 8px;
+    --radius-sm: 6px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
     --radius-full: 9999px;
-  
-    /* Container */
     --container: 1800px;
     --container-wide: 2000px;
     --page-padding: clamp(16px, 3vw, 48px);
-  
+
+    /* Typography — Gotham (Leasing/Deal Pipeline parity) */
+    --font-body: 'Gotham Book', 'Gotham', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    --font-medium: 'Gotham Medium', 'Gotham', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    --text-xs: clamp(10px, 1.8vw, 11px);
+    --text-sm: clamp(11px, 2vw, 13px);
+    --text-base: clamp(13px, 2.2vw, 15px);
+    --text-lg: clamp(14px, 2.5vw, 16px);
+    --text-xl: clamp(16px, 3vw, 20px);
+    --text-2xl: clamp(20px, 4vw, 28px);
+
     /* Charts */
     --tick-band-h: 22px;
     --chart-min-h: 350px;
     --chart-max-h: 70vh;
     --chart-ar: 4/3;
-    
-    /* Transitions - Apple-style smooth */
+
+    /* Status Colors */
+    --success: #10b981;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    --info: #3b82f6;
+
+    /* Transitions */
     --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
-  }
+}
   
   /* Tablet and up - keep mobile sizing until 900px */
   @media (min-width: 640px) and (max-width: 899px){
@@ -75,7 +98,7 @@
   .app-root { display: flex; flex-direction: column; min-height: 0; }
   .app-content, main.page, .page { flex: 1 1 auto; min-height: 0; overflow: hidden; }
   body{
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Helvetica Neue", Helvetica, sans-serif;
+    font-family: var(--font-body);
     color:var(--ink);
     background:var(--bg);
     -webkit-font-smoothing:antialiased;
@@ -116,6 +139,21 @@
     line-height: 1.2;
     flex: 1;
     min-width: 0;
+  }
+  
+  .beta-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    font-size: 0.5em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--primary-green);
+    background: rgba(126, 138, 107, 0.15);
+    border: 1px solid var(--primary-green);
+    border-radius: var(--radius-sm);
+    vertical-align: middle;
   }
   
   .controls{
@@ -3389,35 +3427,35 @@
 /* Aggressive compact mode for small screens */
 @media (max-width: 1024px) {
   button, .seg-btn, .tab, .tab-main, .pill, select, .home-btn, .back-btn, .export-pdf-btn {
-    min-height: 30px;
-    padding: 4px 8px;
-    font-size: 12px;
+    min-height: 28px;
+    padding: 4px 6px;
+    font-size: 11px;
   }
 
   .kpi-card, .kpi, .metric-card, .panel {
-    padding: 10px;
-    min-height: 80px;
+    padding: 8px;
+    min-height: 70px;
   }
 
   .kpi-value, .metric-value {
-    font-size: clamp(18px, 5.5vw, 24px);
-    line-height: 1.1;
+    font-size: clamp(17px, 5vw, 22px);
+    line-height: 1.05;
   }
 
   .kpi-label, .metric-label, .panel-title {
-    font-size: 11px;
+    font-size: 10px;
   }
 }
 
 @media (max-width: 768px) {
   .kpi-grid, .metrics-grid, .analytics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    gap: 6px;
   }
 
   .property-header .meta span {
-    font-size: 11px;
-    margin-right: 8px;
+    font-size: 10px;
+    margin-right: 6px;
   }
 }
 
@@ -3427,7 +3465,7 @@
   }
 
   .kpi-card, .kpi, .metric-card, .panel {
-    min-height: 72px;
+    min-height: 60px;
   }
 }
   
@@ -3472,5 +3510,77 @@
 
   .kpi-value, .metric-value {
     font-size: clamp(18px, 5.5vw, 26px);
+  }
+}
+
+/* === Mobile app mode === */
+@media (max-width: 900px) {
+  body {
+    background: #f7f7f8;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  }
+
+  .tabs-main {
+    background: #f6f7f9;
+    border-color: rgba(15, 23, 42, 0.08);
+  }
+
+  .tab-main {
+    min-height: 36px;
+    padding: 6px 12px;
+  }
+
+  .tab-main.active {
+    box-shadow: 0 10px 18px rgba(126, 138, 107, 0.35);
+  }
+
+  .side-card,
+  .kpi-card,
+  .kpi,
+  .metric-card,
+  .panel,
+  .chart-card {
+    transition: transform .2s ease, box-shadow .2s ease;
+  }
+
+  .side-card:active,
+  .kpi-card:active,
+  .metric-card:active,
+  .panel:active,
+  .chart-card:active {
+    transform: scale(0.99);
+  }
+}
+
+@media (max-width: 640px) {
+  .tabs-main {
+    padding: 4px;
+    gap: 4px;
+  }
+
+  .tab-main {
+    font-size: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side-card,
+  .kpi-card,
+  .kpi,
+  .metric-card,
+  .panel,
+  .chart-card,
+  .tab-main,
+  .tab,
+  .seg-btn,
+  .pill {
+    transition: none !important;
   }
 }

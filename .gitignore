@@ -27,3 +27,6 @@ Thumbs.db
 # Logs
 *.log
 
+# Commodities output
+historical_upload_results.json
+

@@ -25,16 +25,11 @@ jobs:
     
     - name: Run commodities tracker
       env:
-        # All secrets are passed as environment variables
-        # These match the GitHub repository secrets:
-        # - FRED_API_KEY
-        # - FMP_API_KEY
-        # - METALS_API_KEY
-        # - DOMO_WEBHOOK_URL
+        # Free sources only - no paid APIs
+        # Required secrets: FRED_API_KEY, STOAGROUP_API_URL, COMMODITIES_INGEST_KEY
         FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-        METALS_API_KEY: ${{ secrets.METALS_API_KEY }}
-        DOMO_WEBHOOK_URL: ${{ secrets.DOMO_WEBHOOK_URL }}
+        STOAGROUP_API_URL: ${{ secrets.STOAGROUP_API_URL }}
+        COMMODITIES_INGEST_KEY: ${{ secrets.COMMODITIES_INGEST_KEY }}
       run: |
         python commodities_tracker.py
 

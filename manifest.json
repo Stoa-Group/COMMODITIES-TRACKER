@@ -1,0 +1,12 @@
+{
+  "id": "610419de-97d2-4367-a234-4f2676e1f154",
+  "name": "Commodity Tracker (Beta)",
+  "version": "0.0.1",
+  "datasetsMapping": [],
+  "size": {
+    "width": 1,
+    "height": 1
+  },
+  "fullpage": true,
+  "fileName": "manifest.json"
+}

@@ -90,9 +90,28 @@ The module implements the following functions as specified:
 - Domo response codes are printed/logged
 - Execution continues even if one source fails
 
+## Historical Data Upload
+
+To backfill historical data, use the `historical_uploader.py` script:
+
+```bash
+# Upload last 30 days
+python historical_uploader.py --days 30
+
+# Upload specific date range
+python historical_uploader.py --start-date 2024-01-01 --end-date 2024-12-31
+
+# Dry run (test without uploading)
+python historical_uploader.py --days 30 --dry-run
+```
+
+See `HISTORICAL_DATA.md` for detailed documentation.
+
 ## Files
 
 - `commodities_tracker.py`: Main script that collects and sends data
+- `historical_uploader.py`: Script for uploading historical data
 - `requirements.txt`: Python dependencies
 - `.github/workflows/nightly-tracker.yml`: GitHub Actions workflow configuration
 - `sample_output.json`: Example JSON output for testing
+- `HISTORICAL_DATA.md`: Guide for historical data uploads

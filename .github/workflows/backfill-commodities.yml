@@ -1,0 +1,58 @@
+# Manual backfill of historical commodities data to stoagroupDB
+name: Backfill Commodities
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: 'Start date (YYYY-MM-DD)'
+        required: false
+        default: ''
+      end_date:
+        description: 'End date (YYYY-MM-DD)'
+        required: false
+        default: ''
+      years:
+        description: 'Years back from today (used if start/end not set)'
+        required: false
+        default: '3'
+        type: choice
+        options:
+          - '1'
+          - '2'
+          - '3'
+          - '5'
+      dry_run:
+        description: 'Fetch only, do not push to API'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run historical backfill
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          STOAGROUP_API_URL: ${{ secrets.STOAGROUP_API_URL }}
+          COMMODITIES_INGEST_KEY: ${{ secrets.COMMODITIES_INGEST_KEY }}
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            python historical_uploader.py --dry-run
+          elif [ -n "${{ github.event.inputs.start_date }}" ] && [ -n "${{ github.event.inputs.end_date }}" ]; then
+            python historical_uploader.py --start-date "${{ github.event.inputs.start_date }}" --end-date "${{ github.event.inputs.end_date }}"
+          else
+            python historical_uploader.py --years ${{ github.event.inputs.years }}
+          fi
