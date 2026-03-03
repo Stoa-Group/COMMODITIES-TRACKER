@@ -30,3 +30,6 @@ Thumbs.db
 # Commodities output
 historical_upload_results.json
 
+# Virtual env
+.venv/
+
