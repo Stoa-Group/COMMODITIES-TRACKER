@@ -50,8 +50,10 @@ const STOAColors = {
 // ============================================
 // DATA FETCHING - stoagroupDB API (primary)
 // ============================================
-// API base URL - set window.STOAGROUP_API_URL to override; default matches Render deployment
-const STOAGROUP_API_URL = (typeof window !== 'undefined' && window.STOAGROUP_API_URL) || 'https://stoagroup-api.onrender.com';
+// API base URL - set window.STOAGROUP_API_URL to override; auto-detect localhost for local dev
+const STOAGROUP_API_URL = (typeof window !== 'undefined' && window.STOAGROUP_API_URL) ||
+  (typeof window !== 'undefined' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(window.location?.origin || '')
+    ? 'http://localhost:3000' : 'https://stoagroupdb-ddre.onrender.com');
 
 /**
  * Fetch commodities data from stoagroupDB API

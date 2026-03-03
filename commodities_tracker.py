@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
+# Fallback: load from stoagroupDB .env when in same workspace (e.g. Domo Dashboards)
+_load_script_dir = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(_load_script_dir, "..", "stoagroupDB", ".env"))
 
 
 def get_env_var(key, default=None):

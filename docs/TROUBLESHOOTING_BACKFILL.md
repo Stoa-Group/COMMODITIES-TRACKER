@@ -1,4 +1,18 @@
-# Backfill Troubleshooting
+# Backfill & Dashboard Troubleshooting
+
+## Dashboard shows no data / can't update
+
+1. **Wrong API URL**: The dashboard must use `https://stoagroupdb-ddre.onrender.com` (not `stoagroup-api`). The app auto-detects localhost and uses `http://localhost:3000` when running locally.
+2. **Render API returns 500**: The production DB may be missing the commodities schema. See "500 Internal Server Error" below.
+3. **CORS**: If loading from a custom origin, ensure the API's `CORS_ORIGINS` env var includes it, or the API allows all origins when `CORS_ORIGINS` is empty.
+
+## Nightly tracker doesn't push data
+
+1. **GitHub Secrets**: Ensure `FRED_API_KEY`, `STOAGROUP_API_URL`, and `COMMODITIES_INGEST_KEY` are set. `STOAGROUP_API_URL` must be `https://stoagroupdb-ddre.onrender.com` (no trailing slash).
+2. **Ingest 500**: Schema not on Render's DB; run `create_commodities_schema.sql` there.
+3. **ALLOW_INGEST_FAILURE**: The workflow sets this so the job stays green even when push fails. Check the Actions log for `[API] Status:` to see the actual response.
+
+---
 
 ## 500 Internal Server Error
 
@@ -37,7 +51,7 @@ The commodities routes were added to stoagroupDB. Render must have deployed the 
 
 `STOAGROUP_API_URL` in GitHub Secrets must be the **base URL only**, e.g.:
 
-- Correct: `https://stoagroup-api.onrender.com`
+- Correct: `https://stoagroupdb-ddre.onrender.com`
 - Incorrect: `https://stoagroup-api.onrender.com/` (trailing slash – usually OK but avoid)
 - Incorrect: `https://stoagroup-api.onrender.com/api` (would result in `/api/api/commodities/ingest`)
 
@@ -45,7 +59,7 @@ The commodities routes were added to stoagroupDB. Render must have deployed the 
 
 ```bash
 # Replace with your actual API URL
-curl -X GET "https://stoagroup-api.onrender.com/api/commodities?limit=1"
+curl -X GET "https://stoagroupdb-ddre.onrender.com/api/commodities?limit=1"
 ```
 
 - **200** with `[]` or data → commodities route exists
