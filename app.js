@@ -50,24 +50,71 @@ const STOAColors = {
 // ============================================
 // DATA FETCHING - stoagroupDB API (primary)
 // ============================================
-// API base URL - set window.STOAGROUP_API_URL to override; default matches Render deployment
-const STOAGROUP_API_URL = (typeof window !== 'undefined' && window.STOAGROUP_API_URL) || 'https://stoagroup-api.onrender.com';
+// API base URL - set window.STOAGROUP_API_URL to override.
+// Default points to the current Render service.
+const STOAGROUP_API_URL = (typeof window !== 'undefined' && window.STOAGROUP_API_URL) || 'https://stoagroupdb-ddre.onrender.com';
+// Optional fallback hosts if the primary API URL is unavailable.
+const STOAGROUP_API_FALLBACK_URLS = (typeof window !== 'undefined' && Array.isArray(window.STOAGROUP_API_FALLBACK_URLS))
+    ? window.STOAGROUP_API_FALLBACK_URLS
+    : ['https://stoagroup-api.onrender.com'];
+// Dataset aliases to try when fetching from Domo SDK.
+const DOMO_DATASET_ALIASES = (typeof window !== 'undefined' && Array.isArray(window.STOA_DOMO_DATASET_ALIASES) && window.STOA_DOMO_DATASET_ALIASES.length > 0)
+    ? window.STOA_DOMO_DATASET_ALIASES
+    : ['commoditiesdata', 'commodities_data', 'commodities'];
+
+function getApiBaseUrls() {
+    const unique = new Set();
+    [STOAGROUP_API_URL, ...STOAGROUP_API_FALLBACK_URLS].forEach((url) => {
+        if (typeof url !== 'string') return;
+        const trimmed = url.trim();
+        if (!trimmed) return;
+        unique.add(trimmed.replace(/\/$/, ''));
+    });
+    return Array.from(unique);
+}
+
+function parseCommoditiesPayload(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (!payload || typeof payload !== 'object') return [];
+    if (Array.isArray(payload.data)) return payload.data;
+    if (Array.isArray(payload.rows)) return payload.rows;
+    if (Array.isArray(payload.commodities)) return payload.commodities;
+    return [];
+}
 
 /**
  * Fetch commodities data from stoagroupDB API
  * @returns {Promise<Array>} Array of commodity records
  */
 async function fetchCommoditiesFromAPI() {
-    if (!STOAGROUP_API_URL) {
+    const baseUrls = getApiBaseUrls();
+    if (baseUrls.length === 0) {
         throw new Error('STOAGROUP_API_URL not configured. Set window.STOAGROUP_API_URL or configure in app.');
     }
-    const url = `${STOAGROUP_API_URL.replace(/\/$/, '')}/api/commodities?limit=10000`;
-    const res = await fetch(url);
-    if (!res.ok) {
-        throw new Error(`API error: ${res.status} ${res.statusText}`);
+
+    const errors = [];
+
+    for (const baseUrl of baseUrls) {
+        const url = `${baseUrl}/api/commodities?limit=10000`;
+        try {
+            const res = await fetch(url);
+            if (!res.ok) {
+                let detail = '';
+                try {
+                    detail = await res.text();
+                } catch (_) {
+                    detail = '';
+                }
+                throw new Error(`API error: ${res.status} ${res.statusText}${detail ? ` - ${detail.slice(0, 120)}` : ''}`);
+            }
+            const payload = await res.json();
+            return parseCommoditiesPayload(payload);
+        } catch (error) {
+            errors.push(`${baseUrl}: ${error.message}`);
+        }
     }
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+
+    throw new Error(`All API endpoints failed: ${errors.join(' | ')}`);
 }
 
 /**
@@ -79,6 +126,29 @@ async function fetchAlias(alias) {
     const qs = new URLSearchParams();
     qs.set("limit", "10000");
     return domo.get(`/data/v2/${encodeURIComponent(alias)}?${qs.toString()}`);
+}
+
+/**
+ * Fetch data from Domo dataset aliases with fallback.
+ * @returns {Promise<Array>} Array of data rows
+ */
+async function fetchCommoditiesFromDomo() {
+    const errors = [];
+
+    for (const alias of DOMO_DATASET_ALIASES) {
+        try {
+            const payload = await fetchAlias(alias);
+            const rows = parseCommoditiesPayload(payload);
+            if (Array.isArray(rows)) {
+                return rows;
+            }
+            errors.push(`${alias}: invalid payload format`);
+        } catch (error) {
+            errors.push(`${alias}: ${error.message}`);
+        }
+    }
+
+    throw new Error(`Domo dataset fetch failed for aliases [${DOMO_DATASET_ALIASES.join(', ')}]: ${errors.join(' | ')}`);
 }
 
 // ============================================
@@ -133,7 +203,7 @@ function initializeApp() {
  */
 function loadCommoditiesData(silent = false) {
     // Require API URL or Domo
-    const hasApi = !!STOAGROUP_API_URL;
+    const hasApi = getApiBaseUrls().length > 0;
     const hasDomo = typeof domo !== 'undefined' && domo && typeof domo.get === 'function';
     if (!hasApi && !hasDomo) {
         if (!silent) showAlert('No data source configured (STOAGROUP_API_URL or Domo dataset).', 'error');
@@ -153,8 +223,17 @@ function loadCommoditiesData(silent = false) {
         showLoadingState();
     }
     
-    // Fetch from stoagroupDB API (primary) or Domo dataset (fallback)
-    const fetchPromise = hasApi ? fetchCommoditiesFromAPI() : fetchAlias('commoditiesdata');
+    // Fetch from Domo first when available, then API fallback.
+    // This keeps in-platform dashboards resilient when external API has transient issues.
+    const fetchPromise = hasDomo
+        ? fetchCommoditiesFromDomo().catch((domoError) => {
+            console.warn('[STOA Commodities] Domo fetch failed, trying API fallback...', domoError);
+            if (hasApi) {
+                return fetchCommoditiesFromAPI();
+            }
+            throw domoError;
+        })
+        : fetchCommoditiesFromAPI();
     fetchPromise
         .then(function(data) {
             console.log('[STOA Commodities] Raw data received:', data);
