@@ -3114,6 +3114,73 @@
     gap: 2rem;
   }
 
+  .detail-understanding-section {
+    background: var(--grey2);
+    border: 1px solid var(--line-color);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+  }
+
+  .detail-understanding-section h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 1rem 0;
+    color: var(--black);
+  }
+
+  .understanding-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+  }
+
+  .understanding-card {
+    font-size: 0.9rem;
+  }
+
+  .understanding-card strong {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: var(--grey);
+  }
+
+  .understanding-card p {
+    margin: 0;
+    line-height: 1.5;
+    color: var(--black);
+  }
+
+  .understanding-card.full-width {
+    grid-column: 1 / -1;
+  }
+
+  .insights-summary {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: rgba(126, 138, 107, 0.12);
+    border-radius: 8px;
+  }
+
+  .insights-summary h3 {
+    font-size: 0.95rem;
+    margin: 0 0 0.5rem 0;
+  }
+
+  .insights-summary ul {
+    margin: 0;
+    padding-left: 1.25rem;
+  }
+
+  .insights-summary li {
+    margin-bottom: 0.25rem;
+    line-height: 1.4;
+  }
+
+  .metric-subtext {
+    font-size: 0.7rem;
+    opacity: 0.75;
+  }
+
   .detail-metrics-section {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

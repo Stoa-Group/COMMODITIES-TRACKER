@@ -16,8 +16,10 @@ const AppState = {
         search: '',
         material: 'all',
         sortBy: 'value', // Default sort by value
-        sortOrder: 'desc'
+        sortOrder: 'desc',
+        showNotableOnly: true // Overview shows notable trends by default
     },
+    dataMaxDate: null, // Max date in dataset (data through X)
     viewMode: 'grid',
     selectedCommodity: null,
     lastUpdate: null,
@@ -31,6 +33,139 @@ const AppState = {
         comparedCommodities: [] // Array of commodities being compared
     }
 };
+
+/**
+ * Commodity type configs - how each type is measured, what to gauge, and labels
+ * Used for self-explanatory detail pages
+ */
+const COMMODITY_TYPE_CONFIG = {
+    mortgage: {
+        primaryLabel: 'Rate',
+        valueLabel: 'Current Rate',
+        changeLabel: 'Rate Change',
+        unitExplanation: 'Annual percentage rate (APR) for conventional mortgages. Some sources report in basis points (÷100 for %).',
+        /** If raw value > 20, treat as basis points and display as percentage */
+        valueTransform: (v) => (v > 20 ? v / 100 : v),
+        howMeasured: 'Weekly national average from Freddie Mac Primary Mortgage Market Survey (PMMS). Reflects rates offered to prime borrowers with 20% down.',
+        whatToGauge: 'Below 6% favors homebuyers; 6–7% is neutral; above 7% weighs on affordability and demand. Compare to 10-year Treasury for spread.',
+        chartLabel: 'Mortgage Rate',
+        maShortLabel: '3-Point MA',
+        maMediumLabel: '6-Point MA',
+        maLongLabel: '12-Point MA',
+        periodPreset: 'monthly',
+        insights: (a) => {
+            const change30 = parseFloat(a.priceChanges?.change30d) || 0;
+            const insights = [];
+            const v = typeof a.currentValue === 'number' ? a.currentValue : parseFloat(a.currentValue);
+            if (!isNaN(v)) {
+                if (v < 6) insights.push('Rates below 6% support stronger buyer demand.');
+                else if (v > 7) insights.push('Rates above 7% typically cool housing activity.');
+                else insights.push('Rates in the 6–7% range are historically moderate.');
+            }
+            if (change30 < 0) insights.push('Declining rates improve affordability for new buyers.');
+            else if (change30 > 0) insights.push('Rising rates can slow refinancing and purchase activity.');
+            else insights.push('Rates have been stable recently.');
+            return insights;
+        }
+    },
+    housing: {
+        primaryLabel: 'Value',
+        valueLabel: 'Current Value',
+        changeLabel: 'Change',
+        unitExplanation: 'Varies by metric (SAAR = seasonally adjusted annual rate, etc.)',
+        howMeasured: 'Data from Census Bureau, HUD, and FRED. Most series are seasonally adjusted. SAAR = monthly figure expressed as annual rate.',
+        whatToGauge: 'Compare to prior months and year-ago levels. Housing starts/permits lead construction; sales reflect demand.',
+        chartLabel: 'Value',
+        maShortLabel: '3-Point MA',
+        maMediumLabel: '6-Point MA',
+        maLongLabel: '12-Point MA',
+        periodPreset: 'monthly',
+        insights: () => []
+    },
+    lumber: {
+        primaryLabel: 'Price',
+        valueLabel: 'Current Price',
+        changeLabel: 'Price Change',
+        unitExplanation: 'Per 1,000 board feet (MBF). Random Lengths composite or exchange-traded.',
+        howMeasured: 'Cash market or futures settlement prices. Lumber is sensitive to housing starts and seasonal demand.',
+        whatToGauge: 'Track vs. housing starts and permits. Sharp spikes often follow weather events or supply constraints.',
+        chartLabel: 'Price',
+        maShortLabel: '7-Day MA',
+        maMediumLabel: '30-Day MA',
+        maLongLabel: '90-Day MA',
+        periodPreset: 'daily',
+        insights: () => []
+    },
+    metal: {
+        primaryLabel: 'Price',
+        valueLabel: 'Current Price',
+        changeLabel: 'Price Change',
+        unitExplanation: 'Per ton or per lb, depending on metal. Exchange-traded (LME, COMEX).',
+        howMeasured: 'Spot or futures settlement prices from major exchanges. Reflects global supply/demand.',
+        whatToGauge: 'Metals drive construction costs. Copper tracks economic activity; steel follows industrial demand.',
+        chartLabel: 'Price',
+        maShortLabel: '7-Day MA',
+        maMediumLabel: '30-Day MA',
+        maLongLabel: '90-Day MA',
+        periodPreset: 'daily',
+        insights: () => []
+    },
+    construction: {
+        primaryLabel: 'Price',
+        valueLabel: 'Current Price',
+        changeLabel: 'Price Change',
+        unitExplanation: 'Varies by material (per ton, per unit, index points).',
+        howMeasured: 'Producer price indices (PPI) or direct market prices. Construction inputs track materials and labor.',
+        whatToGauge: 'Rising input costs pressure margins; falling costs can improve project economics.',
+        chartLabel: 'Price',
+        maShortLabel: '7-Day MA',
+        maMediumLabel: '30-Day MA',
+        maLongLabel: '90-Day MA',
+        periodPreset: 'daily',
+        insights: () => []
+    },
+    default: {
+        primaryLabel: 'Price',
+        valueLabel: 'Current Price',
+        changeLabel: 'Price Change',
+        unitExplanation: '',
+        howMeasured: 'Market or survey data. Source varies by commodity.',
+        whatToGauge: 'Compare to historical average and recent trend. Consider volatility.',
+        chartLabel: 'Price',
+        maShortLabel: '7-Day MA',
+        maMediumLabel: '30-Day MA',
+        maLongLabel: '90-Day MA',
+        periodPreset: 'daily',
+        insights: () => []
+    }
+};
+
+function getCommodityTypeConfig(commodity) {
+    const p = (commodity.product || '').toLowerCase();
+    const s = (commodity.subcategory || '').toLowerCase();
+    const m = (commodity.material || '').toLowerCase();
+    if (s.includes('mortgage') || (p.includes('mortgage') && (p.includes('rate') || p.includes('fixed')))) return COMMODITY_TYPE_CONFIG.mortgage;
+    if (s.includes('housing') || s.includes('starts') || s.includes('permits') || s.includes('sales')) return COMMODITY_TYPE_CONFIG.housing;
+    if (m === 'lumber' || p.includes('lumber')) return COMMODITY_TYPE_CONFIG.lumber;
+    if (m === 'metal' || p.includes('copper') || p.includes('steel') || p.includes('aluminum')) return COMMODITY_TYPE_CONFIG.metal;
+    if (m === 'construction') return COMMODITY_TYPE_CONFIG.construction;
+    return COMMODITY_TYPE_CONFIG.default;
+}
+
+/** Detect data frequency from records (avg days between points) */
+function getDataFrequency(records) {
+    if (!records || records.length < 2) return 'daily';
+    const sorted = [...records].sort((a, b) => new Date(a.date) - new Date(b.date));
+    let totalDays = 0, count = 0;
+    for (let i = 1; i < sorted.length; i++) {
+        const d = (new Date(sorted[i].date) - new Date(sorted[i - 1].date)) / (24 * 60 * 60 * 1000);
+        if (d > 0 && d < 400) { totalDays += d; count++; }
+    }
+    const avgDays = count ? totalDays / count : 7;
+    if (avgDays >= 20) return 'monthly';
+    if (avgDays >= 4) return 'weekly';
+    return 'daily';
+}
 
 // STOA Brand Colors
 const STOAColors = {
@@ -177,6 +312,19 @@ function loadCommoditiesData(silent = false) {
             
             // Store raw data for analytics
             AppState.rawData = data;
+            
+            // Compute max date in dataset (data through X)
+            let maxDate = null;
+            data.forEach(item => {
+                const d = item.date || item.Date;
+                if (d) {
+                    const parsed = new Date(d);
+                    if (!isNaN(parsed.getTime()) && (!maxDate || parsed > maxDate)) {
+                        maxDate = parsed;
+                    }
+                }
+            });
+            AppState.dataMaxDate = maxDate;
             
             // Process and normalize data
             AppState.commodities = processCommoditiesData(data);
@@ -959,13 +1107,25 @@ function renderCommodities() {
                                  data.length > 0 && 
                                  data[0].category !== undefined;
     
+    // Update Notable/All toggle state (hide for housing - it uses category grouping)
+    const notableToggle = document.getElementById('notableToggle');
+    if (notableToggle) {
+        notableToggle.style.display = AppState.filters.material === 'housing' ? 'none' : '';
+        notableToggle.querySelectorAll('.view-btn').forEach(btn => {
+            btn.classList.toggle('active', String(btn.dataset.notable) === String(AppState.filters.showNotableOnly));
+        });
+    }
+    
     // Update section title and description based on filter
     const sectionDescription = document.querySelector('#commoditiesSectionDescription');
     if (sectionTitle) {
+        const showingNotable = AppState.filters.showNotableOnly && !AppState.filters.search && AppState.filters.material !== 'housing';
         if (AppState.filters.material === 'all' && !AppState.filters.search) {
-            sectionTitle.textContent = 'Significant Movers & Outliers';
+            sectionTitle.textContent = showingNotable ? 'Significant Movers & Outliers' : 'All Commodities';
             if (sectionDescription) {
-                sectionDescription.textContent = 'Showing commodities with significant price changes, alerts, or outliers. Use filters to see all items or click any card for detailed analysis.';
+                sectionDescription.textContent = showingNotable 
+                    ? 'Showing commodities with significant price changes, alerts, or outliers. Use filters or "All" to see everything.'
+                    : 'Showing all commodities. Switch to "Notable" to focus on significant movers.';
             }
         } else if (AppState.filters.material === 'housing' && !AppState.filters.search) {
             sectionTitle.textContent = 'Housing Market Overview';
@@ -979,20 +1139,23 @@ function renderCommodities() {
             }
         } else {
             const materialName = AppState.filters.material.charAt(0).toUpperCase() + AppState.filters.material.slice(1);
-            sectionTitle.textContent = `${materialName} Commodities`;
+            sectionTitle.textContent = showingNotable ? `${materialName} Notable Trends` : `${materialName} Commodities`;
             if (sectionDescription) {
-                sectionDescription.textContent = `All ${materialName.toLowerCase()} commodities. Click any card for detailed analysis and charts.`;
+                sectionDescription.textContent = showingNotable 
+                    ? `Notable price changes and alerts in ${materialName.toLowerCase()}. Switch to "All" to see everything.`
+                    : `All ${materialName.toLowerCase()} commodities. Click any card for detailed analysis and charts.`;
             }
         }
     }
     
     if (data.length === 0) {
+        const showingNotable = AppState.filters.showNotableOnly && !AppState.filters.search && AppState.filters.material !== 'housing';
         container.innerHTML = `
             <div class="empty-state">
                 <div class="empty-icon">📭</div>
                 <h3>No data found</h3>
-                <p>${AppState.filters.material === 'all' && !AppState.filters.search 
-                    ? 'No commodities with significant changes or alerts. Try using filters to see all items.' 
+                <p>${showingNotable 
+                    ? 'No notable trends in this view. Switch to "All" to see all commodities, or try a different filter.' 
                     : 'Try adjusting your filters or search terms'}</p>
             </div>
         `;
@@ -1229,11 +1392,17 @@ function renderMetrics() {
     }
     
     if (lastUpdatedEl) {
-        lastUpdatedEl.textContent = formatTime(AppState.lastUpdate);
+        if (AppState.dataMaxDate) {
+            lastUpdatedEl.textContent = formatDate(AppState.dataMaxDate);
+        } else {
+            lastUpdatedEl.textContent = formatTime(AppState.lastUpdate);
+        }
     }
     
     if (updateSourceEl) {
-        updateSourceEl.textContent = `Data coverage: ${analytics.dataCoverage}%`;
+        updateSourceEl.textContent = AppState.dataMaxDate 
+            ? `Data through ${formatDate(AppState.dataMaxDate)} · ${analytics.dataCoverage}% coverage` 
+            : `Data coverage: ${analytics.dataCoverage}%`;
     }
 }
 
@@ -2717,8 +2886,8 @@ function getFilteredCommodities() {
     
     let filtered = [...AppState.commodities];
     
-    // On "all" filter, only show significant movers/outliers to declutter
-    if (AppState.filters.material === 'all' && !AppState.filters.search) {
+    // Show notable trends by default (significant movers/outliers) - applies to all material views except housing
+    if (AppState.filters.showNotableOnly && !AppState.filters.search && AppState.filters.material !== 'housing') {
         filtered = filtered.filter(c => isSignificantMover(c));
     }
     
@@ -2799,15 +2968,28 @@ function setupEventListeners() {
         });
     });
     
-    // View toggle buttons
-    document.querySelectorAll('.view-btn').forEach(btn => {
+    // View toggle buttons (Grid/List only - data-view)
+    document.querySelectorAll('.view-btn[data-view]').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.view-btn[data-view]').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
             AppState.viewMode = e.target.dataset.view || 'grid';
             renderCommodities();
         });
     });
+    
+    // Notable/All toggle for overview
+    const notableToggle = document.getElementById('notableToggle');
+    if (notableToggle) {
+        notableToggle.addEventListener('click', (e) => {
+            const btn = e.target.closest('.view-btn');
+            if (!btn || !('notable' in btn.dataset)) return;
+            notableToggle.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            AppState.filters.showNotableOnly = btn.dataset.notable === 'true';
+            renderCommodities();
+        });
+    }
     
     // Refresh button
     const refreshBtn = document.getElementById('refreshBtn');
@@ -3128,6 +3310,13 @@ function calculateCommodityAnalytics(commodity) {
     
     const values = validRecords.map(r => r.value);
     const dates = validRecords.map(r => r.date);
+    const dataFreq = getDataFrequency(validRecords);
+    
+    // For monthly data, use 3/6/12-point MAs; for daily, use 7/30/90
+    const maPeriods = dataFreq === 'monthly' ? [3, 6, 12] : [7, 30, 90];
+    const ma7 = calculateMovingAverage(values, maPeriods[0]);
+    const ma30 = calculateMovingAverage(values, maPeriods[1]);
+    const ma90 = calculateMovingAverage(values, maPeriods[2]);
     
     // Basic statistics
     const currentValue = values[values.length - 1];
@@ -3135,20 +3324,17 @@ function calculateCommodityAnalytics(commodity) {
     const maxValue = Math.max(...values);
     const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
     
-    // Calculate moving averages
-    const ma7 = calculateMovingAverage(values, 7);
-    const ma30 = calculateMovingAverage(values, 30);
-    const ma90 = calculateMovingAverage(values, 90);
-    
     // Volatility (standard deviation)
     const variance = values.reduce((acc, val) => acc + Math.pow(val - avgValue, 2), 0) / values.length;
     const volatility = Math.sqrt(variance);
     const volatilityPercent = (volatility / avgValue) * 100;
     
-    // Price changes
+    // Price changes (frequency-aware: monthly uses 1/3/12 month lookbacks)
+    const idx1 = dataFreq === 'monthly' ? Math.max(0, values.length - 2) : Math.max(0, values.length - 31);
+    const idx3 = dataFreq === 'monthly' ? Math.max(0, values.length - 4) : Math.max(0, values.length - 91);
     const change7d = values.length >= 2 ? ((currentValue - values[Math.max(0, values.length - 8)]) / values[Math.max(0, values.length - 8)]) * 100 : 0;
-    const change30d = values.length >= 2 ? ((currentValue - values[Math.max(0, values.length - 31)]) / values[Math.max(0, values.length - 31)]) * 100 : 0;
-    const change90d = values.length >= 2 ? ((currentValue - values[0]) / values[0]) * 100 : 0;
+    const change30d = values.length >= 2 ? ((currentValue - values[idx1]) / values[idx1]) * 100 : 0;
+    const change90d = values.length >= 2 ? ((currentValue - values[idx3]) / values[idx3]) * 100 : 0;
     
     // Trend analysis
     const recentTrend = calculateTrendDirection(values.slice(-7));
@@ -3312,18 +3498,59 @@ function renderCommodityDetailPage(commodity, analytics, predictions) {
         predictions = { hasPrediction: false };
     }
     
+    const typeConfig = getCommodityTypeConfig(commodity);
+    const records = commodity.historicalRecords || [];
+    const validRecords = records.filter(r => r.hasValue && r.value !== null);
+    const dataFreq = getDataFrequency(validRecords);
+    const isMonthly = dataFreq === 'monthly';
+    
+    // Period button config: monthly data uses 3m/6m/1y, daily uses 7d/30d/90d
+    const periodButtons = isMonthly 
+        ? [
+            { period: 'all', label: 'All Time' },
+            { period: '1y', label: '1 Year' },
+            { period: '6m', label: '6 Months' },
+            { period: '3m', label: '3 Months' }
+        ]
+        : [
+            { period: 'all', label: 'All Time' },
+            { period: '90d', label: '90 Days' },
+            { period: '30d', label: '30 Days' },
+            { period: '7d', label: '7 Days' }
+        ];
+    
     return `
-        <div class="detail-page-wrapper">
+        <div class="detail-page-wrapper" data-frequency="${dataFreq}">
+            <!-- Understanding this metric -->
+            <section class="detail-understanding-section">
+                <h3>Understanding this metric</h3>
+                <div class="understanding-grid">
+                    <div class="understanding-card">
+                        <strong>How it's measured:</strong>
+                        <p>${escapeHtml(typeConfig.howMeasured)}</p>
+                    </div>
+                    <div class="understanding-card">
+                        <strong>What to gauge it by:</strong>
+                        <p>${escapeHtml(typeConfig.whatToGauge)}</p>
+                    </div>
+                    ${typeConfig.unitExplanation ? `
+                    <div class="understanding-card full-width">
+                        <strong>Unit:</strong> ${escapeHtml(typeConfig.unitExplanation)} — ${escapeHtml(commodity.unit || 'N/A')}
+                    </div>
+                    ` : ''}
+                </div>
+            </section>
+            
             <!-- Key Metrics Section -->
             <section class="detail-metrics-section">
                 <div class="metric-card primary">
-                    <div class="metric-label">${commodity.material === 'housing' ? 'Current Value' : 'Current Price'}</div>
-                    <div class="metric-value">${commodity.displayValue || 'N/A'}</div>
-                    <div class="metric-unit">${escapeHtml(commodity.unit || '')}</div>
+                    <div class="metric-label">${typeConfig.valueLabel}</div>
+                    <div class="metric-value">${typeConfig.valueTransform && commodity.value != null ? formatValue(typeConfig.valueTransform(commodity.value), 'Percent', 'housing') : (commodity.displayValue || 'N/A')}</div>
+                    <div class="metric-unit">${typeConfig.valueTransform && commodity.value > 20 ? 'APR' : escapeHtml(commodity.unit || '')}</div>
                 </div>
                 ${analytics && analytics.hasData ? `
                     <div class="metric-card">
-                        <div class="metric-label">30-Day Change</div>
+                        <div class="metric-label">${isMonthly ? '1-Month' : '30-Day'} ${typeConfig.changeLabel}</div>
                         <div class="metric-value ${analytics.priceChanges.change30d >= 0 ? 'positive' : 'negative'}">
                             ${analytics.priceChanges.change30d >= 0 ? '+' : ''}${analytics.priceChanges.change30d}%
                         </div>
@@ -3331,10 +3558,12 @@ function renderCommodityDetailPage(commodity, analytics, predictions) {
                     <div class="metric-card">
                         <div class="metric-label">Volatility</div>
                         <div class="metric-value">${analytics.volatilityPercent}%</div>
+                        <div class="metric-subtext">Variation around average</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-label">Data Points</div>
                         <div class="metric-value">${analytics.dataPoints}</div>
+                        <div class="metric-subtext">${dataFreq === 'monthly' ? 'Monthly observations' : 'Data points in history'}</div>
                     </div>
                 ` : ''}
             </section>
@@ -3342,12 +3571,11 @@ function renderCommodityDetailPage(commodity, analytics, predictions) {
             <!-- Price History Chart -->
             <section class="detail-chart-section">
                 <div class="section-header">
-                    <h2>${commodity.material === 'housing' ? 'Data History & Moving Averages' : 'Price History & Moving Averages'}</h2>
+                    <h2>${typeConfig.chartLabel} History & Moving Averages</h2>
                     <div class="chart-controls">
-                        <button class="chart-btn active" data-period="all">All Time</button>
-                        <button class="chart-btn" data-period="90d">90 Days</button>
-                        <button class="chart-btn" data-period="30d">30 Days</button>
-                        <button class="chart-btn" data-period="7d">7 Days</button>
+                        ${periodButtons.map((pb, i) => `
+                            <button class="chart-btn ${i === 0 ? 'active' : ''}" data-period="${pb.period}">${pb.label}</button>
+                        `).join('')}
                         <button class="export-chart-btn" id="exportDetailChartBtn" title="Export chart data">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
@@ -3365,9 +3593,23 @@ function renderCommodityDetailPage(commodity, analytics, predictions) {
                 <!-- Analytics Section -->
                 <section class="detail-analytics-section">
                     <h2>Analytics & Insights</h2>
+                    ${(() => {
+                        const insights = typeConfig.insights(analytics);
+                        if (insights && insights.length > 0) {
+                            return `
+                            <div class="insights-summary">
+                                <h3>Key takeaways</h3>
+                                <ul>
+                                    ${insights.map(i => `<li>${escapeHtml(i)}</li>`).join('')}
+                                </ul>
+                            </div>
+                            `;
+                        }
+                        return '';
+                    })()}
                     <div class="analytics-grid">
                         <div class="analytics-card">
-                            <h3>${commodity.material === 'housing' ? 'Value Statistics' : 'Price Statistics'}</h3>
+                            <h3>${typeConfig.primaryLabel} Statistics</h3>
                             <div class="stat-row">
                                 <span class="stat-label">Current:</span>
                                 <span class="stat-value">${formatValue(analytics.currentValue, commodity.unit, commodity.material)}</span>
@@ -3397,15 +3639,15 @@ function renderCommodityDetailPage(commodity, analytics, predictions) {
                         <div class="analytics-card">
                             <h3>Moving Averages</h3>
                             <div class="stat-row">
-                                <span class="stat-label">7-Day MA:</span>
+                                <span class="stat-label">${typeConfig.maShortLabel}:</span>
                                 <span class="stat-value">${formatValue(analytics.movingAverages.ma7, commodity.unit, commodity.material)}</span>
                             </div>
                             <div class="stat-row">
-                                <span class="stat-label">30-Day MA:</span>
+                                <span class="stat-label">${typeConfig.maMediumLabel}:</span>
                                 <span class="stat-value">${formatValue(analytics.movingAverages.ma30, commodity.unit, commodity.material)}</span>
                             </div>
                             <div class="stat-row">
-                                <span class="stat-label">90-Day MA:</span>
+                                <span class="stat-label">${typeConfig.maLongLabel}:</span>
                                 <span class="stat-value">${formatValue(analytics.movingAverages.ma90, commodity.unit, commodity.material)}</span>
                             </div>
                         </div>
@@ -3482,13 +3724,32 @@ function renderCommodityDetailPage(commodity, analytics, predictions) {
 
 /**
  * Render charts for commodity detail page
+ * @param {string} period - Optional: 'all', '90d', '30d', '7d' (daily) or '3m', '6m', '1y' (monthly)
  */
-function renderCommodityDetailCharts(commodity, analytics) {
+function renderCommodityDetailCharts(commodity, analytics, period) {
     const canvas = document.getElementById('detailPriceChart');
     if (!canvas || typeof Chart === 'undefined') return;
     
     const records = commodity.historicalRecords || [];
-    const validRecords = records.filter(r => r.hasValue && r.value !== null).sort((a, b) => new Date(a.date) - new Date(b.date));
+    let validRecords = records.filter(r => r.hasValue && r.value !== null).sort((a, b) => new Date(a.date) - new Date(b.date));
+    const dataFreq = getDataFrequency(validRecords);
+    const isMonthly = dataFreq === 'monthly';
+    
+    // Filter by period if specified
+    if (period && period !== 'all' && validRecords.length > 0) {
+        const latest = new Date(validRecords[validRecords.length - 1].date);
+        let cutoff = new Date(latest);
+        if (isMonthly) {
+            if (period === '3m') cutoff.setMonth(cutoff.getMonth() - 3);
+            else if (period === '6m') cutoff.setMonth(cutoff.getMonth() - 6);
+            else if (period === '1y') cutoff.setFullYear(cutoff.getFullYear() - 1);
+        } else {
+            if (period === '7d') cutoff.setDate(cutoff.getDate() - 7);
+            else if (period === '30d') cutoff.setDate(cutoff.getDate() - 30);
+            else if (period === '90d') cutoff.setDate(cutoff.getDate() - 90);
+        }
+        validRecords = validRecords.filter(r => new Date(r.date) >= cutoff);
+    }
     
     if (validRecords.length === 0) {
         // Show message if no data
@@ -3502,6 +3763,18 @@ function renderCommodityDetailCharts(commodity, analytics) {
     const labels = validRecords.map(r => formatDate(r.date));
     const prices = validRecords.map(r => r.value);
     
+    // Align MA arrays with filtered data (slice to same length when period filter applied)
+    let ma7Data = analytics?.movingAverages?.ma7Data;
+    let ma30Data = analytics?.movingAverages?.ma30Data;
+    let ma90Data = analytics?.movingAverages?.ma90Data;
+    if (analytics && ma7Data && validRecords.length < (analytics.dataPoints || 0)) {
+        const start = analytics.dataPoints - validRecords.length;
+        ma7Data = ma7Data.slice(start);
+        ma30Data = ma30Data ? ma30Data.slice(start) : null;
+        ma90Data = ma90Data ? ma90Data.slice(start) : null;
+    }
+    
+    const typeConfig = getCommodityTypeConfig(commodity);
     const ctx = canvas.getContext('2d');
     
     // Destroy existing chart if present
@@ -3515,7 +3788,7 @@ function renderCommodityDetailCharts(commodity, analytics) {
             labels: labels,
             datasets: [
                 {
-                    label: commodity.material === 'housing' ? 'Value' : 'Price',
+                    label: typeConfig.chartLabel,
                     data: prices,
                     borderColor: STOAColors.green || '#7e8a6b',
                     backgroundColor: STOAColors.green + '20',
@@ -3526,9 +3799,9 @@ function renderCommodityDetailCharts(commodity, analytics) {
                     pointHoverRadius: 10,
                     pointHitRadius: 15
                 },
-                analytics && analytics.movingAverages && analytics.movingAverages.ma7Data && analytics.movingAverages.ma7Data.length > 0 ? {
-                    label: '7-Day MA',
-                    data: analytics.movingAverages.ma7Data,
+                ma7Data && ma7Data.length > 0 ? {
+                    label: typeConfig.maShortLabel,
+                    data: ma7Data,
                     borderColor: STOAColors.blue || '#bdc2ce',
                     borderWidth: 3,
                     borderDash: [5, 5],
@@ -3538,9 +3811,9 @@ function renderCommodityDetailCharts(commodity, analytics) {
                     pointHoverRadius: 8,
                     pointHitRadius: 12
                 } : null,
-                analytics && analytics.movingAverages && analytics.movingAverages.ma30Data && analytics.movingAverages.ma30Data.length > 0 ? {
-                    label: '30-Day MA',
-                    data: analytics.movingAverages.ma30Data,
+                ma30Data && ma30Data.length > 0 ? {
+                    label: typeConfig.maMediumLabel,
+                    data: ma30Data,
                     borderColor: STOAColors.green2 || '#a6ad8a',
                     borderWidth: 3,
                     borderDash: [10, 5],
@@ -3550,9 +3823,9 @@ function renderCommodityDetailCharts(commodity, analytics) {
                     pointHoverRadius: 8,
                     pointHitRadius: 12
                 } : null,
-                analytics && analytics.movingAverages && analytics.movingAverages.ma90Data && analytics.movingAverages.ma90Data.length > 0 ? {
-                    label: '90-Day MA',
-                    data: analytics.movingAverages.ma90Data,
+                ma90Data && ma90Data.length > 0 ? {
+                    label: typeConfig.maLongLabel,
+                    data: ma90Data,
                     borderColor: STOAColors.grey || '#757270',
                     borderWidth: 3,
                     borderDash: [15, 5],
@@ -3623,6 +3896,30 @@ function renderCommodityDetailCharts(commodity, analytics) {
             }
         }
     });
+}
+
+/**
+ * Wire up detail page chart controls (period buttons, export)
+ */
+function setupDetailPageControls(commodity, analytics) {
+    const wrapper = document.querySelector('.detail-page-wrapper');
+    if (!wrapper) return;
+    
+    // Chart period buttons
+    wrapper.querySelectorAll('.chart-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            wrapper.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            const period = this.dataset.period;
+            renderCommodityDetailCharts(commodity, analytics, period);
+        });
+    });
+    
+    // Export chart button
+    const exportBtn = document.getElementById('exportDetailChartBtn');
+    if (exportBtn) {
+        exportBtn.onclick = () => exportCommodityData(commodity);
+    }
 }
 
 /**
@@ -4198,8 +4495,14 @@ function renderErrorState() {
  */
 function updateLastUpdateTime() {
     const lastUpdateEl = document.getElementById('lastUpdate');
-    if (lastUpdateEl && AppState.lastUpdate) {
-        lastUpdateEl.textContent = `Updated ${formatRelativeTime(AppState.lastUpdate)}`;
+    if (lastUpdateEl) {
+        if (AppState.dataMaxDate) {
+            lastUpdateEl.textContent = `Data through ${formatDate(AppState.dataMaxDate)}`;
+        } else if (AppState.lastUpdate) {
+            lastUpdateEl.textContent = `Updated ${formatRelativeTime(AppState.lastUpdate)}`;
+        } else {
+            lastUpdateEl.textContent = 'Loading...';
+        }
     }
 }
 
@@ -4231,7 +4534,8 @@ function initializeCharts() {
  * @returns {string} Formatted value string
  */
 function formatValue(value, unit, material = null) {
-    if (!value || value === 0) return 'N/A';
+    const num = typeof value === 'number' && !isNaN(value) ? value : parseFloat(value);
+    if (num == null || isNaN(num)) return 'N/A';
     
     // Check if this is housing data or non-currency unit
     const isHousing = material === 'housing';
@@ -4247,32 +4551,32 @@ function formatValue(value, unit, material = null) {
     // For housing data or non-currency units, don't use dollar signs
     if (isHousing || isNonCurrency) {
         if (unit && unit.includes('Index')) {
-            return value.toFixed(2);
+            return num.toFixed(2);
         }
         
         if (unit && (unit.includes('Percent') || unit.toLowerCase().includes('percent'))) {
-            return value.toFixed(2) + '%';
+            return num.toFixed(2) + '%';
         }
         
         // For large numbers, use K/M notation without dollar sign
-        if (value >= 1000000) {
-            return `${(value / 1000000).toFixed(2)}M`;
-        } else if (value >= 1000) {
-            return `${(value / 1000).toFixed(2)}K`;
+        if (num >= 1000000) {
+            return `${(num / 1000000).toFixed(2)}M`;
+        } else if (num >= 1000) {
+            return `${(num / 1000).toFixed(2)}K`;
         }
         
         // Format with commas but no dollar sign
-        return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
     
     // For currency values (commodities)
-    if (value >= 1000000) {
-        return `$${(value / 1000000).toFixed(2)}M`;
-    } else if (value >= 1000) {
-        return `$${(value / 1000).toFixed(2)}K`;
+    if (num >= 1000000) {
+        return `$${(num / 1000000).toFixed(2)}M`;
+    } else if (num >= 1000) {
+        return `$${(num / 1000).toFixed(2)}K`;
     }
     
-    return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 /**
