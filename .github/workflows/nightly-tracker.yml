@@ -12,10 +12,10 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
     
@@ -30,6 +30,8 @@ jobs:
         FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         STOAGROUP_API_URL: ${{ secrets.STOAGROUP_API_URL }}
         COMMODITIES_INGEST_KEY: ${{ secrets.COMMODITIES_INGEST_KEY }}
+        # Keep nightly job green when downstream ingest API has transient outages.
+        ALLOW_INGEST_FAILURE: 'true'
       run: |
         python commodities_tracker.py
 
