@@ -1604,7 +1604,8 @@ function renderHousingStartsPermits(startsData, permitsData) {
                         borderWidth: 2,
                         fill: false,
                         tension: 0.3,
-                        pointRadius: 0
+                        spanGaps: true,
+                        pointRadius: allDates.length <= 5 ? 5 : 0
                     }
                 ]
             },
@@ -1709,7 +1710,8 @@ function renderNewHomeSales(salesData) {
                         borderWidth: 2,
                         fill: false,
                         tension: 0.3,
-                        pointRadius: 0
+                        spanGaps: true,
+                        pointRadius: labels.length <= 5 ? 5 : 0
                     }
                 ]
             },
@@ -1814,7 +1816,8 @@ function renderExistingHomeSales(salesData) {
                         borderWidth: 2,
                         fill: false,
                         tension: 0.3,
-                        pointRadius: 0
+                        spanGaps: true,
+                        pointRadius: labels.length <= 5 ? 5 : 0
                     }
                 ]
             },
@@ -3779,6 +3782,7 @@ function renderCommodityDetailCharts(commodity, analytics, period) {
     
     const typeConfig = getCommodityTypeConfig(commodity);
     const ctx = canvas.getContext('2d');
+    const detailPointRadius = labels.length <= 5 ? 5 : 0;
     
     // Destroy existing chart if present
     if (AppState.detailChart) {
@@ -3798,7 +3802,8 @@ function renderCommodityDetailCharts(commodity, analytics, period) {
                     borderWidth: 4,
                     fill: true,
                     tension: 0.3,
-                    pointRadius: 0,
+                    spanGaps: true,
+                    pointRadius: detailPointRadius,
                     pointHoverRadius: 10,
                     pointHitRadius: 15
                 },
@@ -3810,7 +3815,8 @@ function renderCommodityDetailCharts(commodity, analytics, period) {
                     borderDash: [5, 5],
                     fill: false,
                     tension: 0.3,
-                    pointRadius: 0,
+                    spanGaps: true,
+                    pointRadius: detailPointRadius,
                     pointHoverRadius: 8,
                     pointHitRadius: 12
                 } : null,
@@ -3822,7 +3828,8 @@ function renderCommodityDetailCharts(commodity, analytics, period) {
                     borderDash: [10, 5],
                     fill: false,
                     tension: 0.3,
-                    pointRadius: 0,
+                    spanGaps: true,
+                    pointRadius: detailPointRadius,
                     pointHoverRadius: 8,
                     pointHitRadius: 12
                 } : null,
@@ -3834,7 +3841,8 @@ function renderCommodityDetailCharts(commodity, analytics, period) {
                     borderDash: [15, 5],
                     fill: false,
                     tension: 0.3,
-                    pointRadius: 0,
+                    spanGaps: true,
+                    pointRadius: detailPointRadius,
                     pointHoverRadius: 8,
                     pointHitRadius: 12
                 } : null
@@ -4011,10 +4019,15 @@ function renderMaterialComparisonChart(material, commodities) {
     });
     const sortedDates = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
     
-    // Limit to last 90 days for readability
+    // Use 365 days to capture monthly FRED/PPI data (~12 points); fallback to all if sparse
     const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - 90);
-    const recentDates = sortedDates.filter(d => new Date(d) >= cutoffDate);
+    cutoffDate.setDate(cutoffDate.getDate() - 365);
+    let recentDates = sortedDates.filter(d => new Date(d) >= cutoffDate);
+    if (recentDates.length < 2) recentDates = sortedDates;
+    if (recentDates.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
     
     // Create datasets for each commodity
     const datasets = validCommodities.slice(0, 10).map((commodity, index) => {
@@ -4036,6 +4049,7 @@ function renderMaterialComparisonChart(material, commodities) {
             '#00bcd4'
         ];
         
+        const pointRadius = recentDates.length <= 5 ? 5 : 0;
         return {
             label: commodity.product,
             data: data,
@@ -4044,7 +4058,8 @@ function renderMaterialComparisonChart(material, commodities) {
             borderWidth: 2,
             fill: false,
             tension: 0.3,
-            pointRadius: 0,
+            spanGaps: true,
+            pointRadius,
             pointHoverRadius: 10,
             pointHitRadius: 15
         };
@@ -4206,13 +4221,15 @@ function renderHousingStartsComparisonChart() {
     });
     const sortedDates = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
     
-    // Limit to last 90 days
+    // Use 365 days for monthly housing data; fallback to all if sparse
     const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - 90);
-    const recentDates = sortedDates.filter(d => new Date(d) >= cutoffDate);
+    cutoffDate.setDate(cutoffDate.getDate() - 365);
+    let recentDates = sortedDates.filter(d => new Date(d) >= cutoffDate);
+    if (recentDates.length < 2) recentDates = sortedDates;
     
     // Group by region
     const regions = ['Northeast', 'Midwest', 'South', 'West'];
+    const housingPointRadius = recentDates.length <= 5 ? 5 : 0;
     const datasets = regions.map((region, index) => {
         const commodity = housingStarts.find(c => extractRegionFromProduct(c.product) === region);
         if (!commodity) return null;
@@ -4237,7 +4254,8 @@ function renderHousingStartsComparisonChart() {
             borderWidth: 3,
             fill: false,
             tension: 0.3,
-            pointRadius: 0,
+            spanGaps: true,
+            pointRadius: housingPointRadius,
             pointHoverRadius: 10,
             pointHitRadius: 15
         };
