@@ -18,6 +18,9 @@ import os
 import argparse
 
 load_dotenv()
+# Fallback: load from stoagroupDB .env when in same workspace (e.g. Domo Dashboards)
+_load_script_dir = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(_load_script_dir, "..", "stoagroupDB", ".env"))
 
 
 def get_env_var(key, default=None):
@@ -28,7 +31,7 @@ def get_env_var(key, default=None):
 
 
 FRED_API_KEY = get_env_var("FRED_API_KEY")
-STOAGROUP_API_URL = get_env_var("STOAGROUP_API_URL", "").rstrip("/")
+STOAGROUP_API_URL = (get_env_var("STOAGROUP_API_URL") or get_env_var("API_BASE_URL") or "").rstrip("/")
 COMMODITIES_INGEST_KEY = get_env_var("COMMODITIES_INGEST_KEY")
 
 # Same FRED series as commodities_tracker.py
