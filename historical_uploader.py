@@ -163,9 +163,11 @@ def push_to_stoagroup(payload, dry_run=False):
             else:
                 print(f"[ERROR] Ingest batch failed: {r.status_code} {r.text[:300]}")
                 if r.status_code == 404:
-                    print("[HINT] 404 = commodities route not found. Ensure: (1) stoagroupDB API is deployed "
-                          "with commodities routes (push to main), (2) STOAGROUP_API_URL is the base only "
-                          "(e.g. https://stoagroup-api.onrender.com, no /api suffix)")
+                    print("[HINT] 404 = commodities route not found. Ensure stoagroupDB API is deployed "
+                          "with commodities routes and STOAGROUP_API_URL is the base only (no /api suffix).")
+                elif r.status_code == 500:
+                    print("[HINT] 500 = server error. Usually means the commodities schema is missing. "
+                          "Run schema/create_commodities_schema.sql on your production database (Azure/SSMS).")
                 return False, total
         except Exception as e:
             print(f"[ERROR] Ingest failed: {e}")

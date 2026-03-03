@@ -1,6 +1,22 @@
-# Backfill 404 Troubleshooting
+# Backfill Troubleshooting
 
-If the GitHub Actions backfill fails with **404 Not Found** when pushing to the API:
+## 500 Internal Server Error
+
+If the backfill fails with **500** and `{"error":"Failed to ingest commodities data"}`:
+
+**Most likely cause:** The commodities schema has not been run on the production database.
+
+**Fix:** Run `schema/create_commodities_schema.sql` on your production database:
+- Azure Portal → Query editor (or connect via SSMS)
+- Execute the script from `stoagroupDB/schema/create_commodities_schema.sql`
+
+This creates the `commodities` schema and `commodities.CommodityPrice` table. Then re-run the backfill.
+
+---
+
+## 404 Not Found
+
+If the backfill fails with **404 Not Found** when pushing to the API:
 
 ## 1. Verify the commodities API is deployed
 
