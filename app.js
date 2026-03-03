@@ -4008,7 +4008,6 @@ function renderMaterialComparisonChart(material, commodities) {
     
     section.style.display = 'block';
     const materialName = material.charAt(0).toUpperCase() + material.slice(1);
-    if (title) title.textContent = `${materialName} Price Trends Comparison`;
     
     // Get all unique dates across all commodities
     const allDates = new Set();
@@ -4029,6 +4028,26 @@ function renderMaterialComparisonChart(material, commodities) {
         return;
     }
     
+    const useBarChart = recentDates.length === 1;
+    if (title) {
+        title.textContent = useBarChart
+            ? `${materialName} Price Comparison (as of ${formatDate(recentDates[0])})`
+            : `${materialName} Price Trends Comparison`;
+    }
+    
+    const colors = [
+        STOAColors.green || '#7e8a6b',
+        STOAColors.blue || '#bdc2ce',
+        STOAColors.green2 || '#a6ad8a',
+        STOAColors.grey || '#757270',
+        '#4caf50',
+        '#f44336',
+        '#ff9800',
+        '#2196f3',
+        '#9c27b0',
+        '#00bcd4'
+    ];
+    
     // Create datasets for each commodity
     const datasets = validCommodities.slice(0, 10).map((commodity, index) => {
         const data = recentDates.map(date => {
@@ -4036,32 +4055,26 @@ function renderMaterialComparisonChart(material, commodities) {
             return record ? record.value : null;
         });
         
-        const colors = [
-            STOAColors.green || '#7e8a6b',
-            STOAColors.blue || '#bdc2ce',
-            STOAColors.green2 || '#a6ad8a',
-            STOAColors.grey || '#757270',
-            '#4caf50',
-            '#f44336',
-            '#ff9800',
-            '#2196f3',
-            '#9c27b0',
-            '#00bcd4'
-        ];
-        
+        const color = colors[index % colors.length];
         const pointRadius = recentDates.length <= 5 ? 5 : 0;
-        return {
+        const base = {
             label: commodity.product,
             data: data,
-            borderColor: colors[index % colors.length],
-            backgroundColor: colors[index % colors.length] + '20',
-            borderWidth: 2,
+            backgroundColor: color + (useBarChart ? 'cc' : '20'),
+            borderColor: color,
+            borderWidth: useBarChart ? 1 : 2,
+            pointHoverRadius: 10,
+            pointHitRadius: 15
+        };
+        if (useBarChart) {
+            return base;
+        }
+        return {
+            ...base,
             fill: false,
             tension: 0.3,
             spanGaps: true,
-            pointRadius,
-            pointHoverRadius: 10,
-            pointHitRadius: 15
+            pointRadius
         };
     });
     
@@ -4145,7 +4158,7 @@ function renderMaterialComparisonChart(material, commodities) {
     }
     
     AppState.materialComparisonChart = new Chart(ctx, {
-        type: 'line',
+        type: useBarChart ? 'bar' : 'line',
         data: {
             labels: recentDates.map(d => formatDate(d)),
             datasets: datasets
