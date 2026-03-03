@@ -188,7 +188,7 @@ const STOAColors = {
 // API base URL - set window.STOAGROUP_API_URL to override; auto-detect localhost for local dev
 const STOAGROUP_API_URL = (typeof window !== 'undefined' && window.STOAGROUP_API_URL) ||
   (typeof window !== 'undefined' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(window.location?.origin || '')
-    ? 'http://localhost:3000' : 'https://stoagroupdb-ddre.onrender.com');
+    ? 'http://localhost:3002' : 'https://stoagroupdb-ddre.onrender.com');
 
 /**
  * Fetch commodities data from stoagroupDB API
@@ -233,10 +233,10 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeApp() {
     console.log('[STOA Commodities] Initializing app...');
     
-    // Require either Domo SDK (for dataset fallback) or STOAGROUP_API_URL (for API fetch)
+    // Require API URL (primary). Domo dataset only when explicitly configured and no API.
     const hasDomo = typeof domo !== 'undefined' && domo && typeof domo.get === 'function';
     const hasApiUrl = !!STOAGROUP_API_URL;
-    if (!hasDomo && !hasApiUrl) {
+    if (!hasApiUrl && !hasDomo) {
         console.error('[STOA Commodities] Neither Domo SDK nor STOAGROUP_API_URL available');
         showAlert('Please configure STOAGROUP_API_URL (window.STOAGROUP_API_URL) for API data source.', 'error');
         renderErrorState();
@@ -290,8 +290,8 @@ function loadCommoditiesData(silent = false) {
         showLoadingState();
     }
     
-    // Fetch from stoagroupDB API (primary) or Domo dataset (fallback)
-    const fetchPromise = hasApi ? fetchCommoditiesFromAPI() : fetchAlias('commoditiesdata');
+    // Fetch from stoagroupDB API only (no Domo fallback)
+    const fetchPromise = hasApi ? fetchCommoditiesFromAPI() : (hasDomo ? fetchAlias('commoditiesdata') : Promise.reject(new Error('No data source configured')));
     fetchPromise
         .then(function(data) {
             console.log('[STOA Commodities] Raw data received:', data);
@@ -391,21 +391,23 @@ function processCommoditiesData(rawData) {
     const productGroups = {};
     
     rawData.forEach((item, index) => {
-        // Parse and validate values
-        const value = item.value !== null && item.value !== undefined && item.value !== '' 
-            ? parseFloat(item.value) 
+        // Normalize keys (API uses lowercase; Domo may use PascalCase)
+        const r = (k) => item[k] ?? item[k.charAt(0).toUpperCase() + k.slice(1)];
+        const value = r('value') !== null && r('value') !== undefined && String(r('value')).trim() !== ''
+            ? parseFloat(r('value'))
             : null;
-        const unit = item.unit || 'N/A';
-        const date = item.date || new Date().toISOString().split('T')[0];
-        const product = item.product || 'Unknown';
+        const unit = r('unit') || 'N/A';
+        const dateRaw = r('date') ?? r('Date');
+        const date = dateRaw ? (dateRaw instanceof Date ? dateRaw.toISOString().slice(0, 10) : String(dateRaw).slice(0, 10)) : new Date().toISOString().split('T')[0];
+        const product = (r('product') || r('Product') || 'Unknown').toString().trim();
         
         // Initialize product group if it doesn't exist
         if (!productGroups[product]) {
             productGroups[product] = {
                 product: product,
-                material: item.material || 'unknown',
-                subcategory: item.subcategory || 'unknown',
-                source: item.source || 'unknown',
+                material: (r('material') || r('Material') || 'unknown').toString().trim(),
+                subcategory: (r('subcategory') || r('Subcategory') || 'unknown').toString().trim(),
+                source: (r('source') || r('Source') || 'unknown').toString().trim(),
                 unit: unit,
                 records: [], // All historical records for this product
                 latestRecord: null,
@@ -459,8 +461,8 @@ function processCommoditiesData(rawData) {
         // Check for alerts (missing data, stale data, etc.)
         const alerts = checkAlerts(latest || {}, value, date);
         
-        // Calculate price change indicators
-        const priceChange = calculatePriceChange(latest || {}, value);
+        // Calculate price change indicators (use trend for meaningful comparison)
+        const priceChange = calculatePriceChange({ ...(latest || {}), trend }, value);
         
         return {
             product: group.product,
@@ -629,25 +631,20 @@ function calculatePriceChange(item, value) {
         };
     }
     
-    // In a real implementation, this would compare with historical averages
-    // For now, we'll use a simple classification based on value ranges
-    const avgValue = AppState.analytics?.avgValue || 0;
-    
-    if (avgValue > 0) {
-        const ratio = value / avgValue;
-        if (ratio > 1.2) {
+    // Use trend when available; avoid mixing commodities via global avg
+    if (item.trend && item.trend.direction !== 'neutral') {
+        if (item.trend.direction === 'up') {
             return {
                 status: 'high',
-                label: 'Above Average',
+                label: 'Trending Up',
                 color: STOAColors.warning
             };
-        } else if (ratio < 0.8) {
-            return {
-                status: 'low',
-                label: 'Below Average',
-                color: STOAColors.success
-            };
         }
+        return {
+            status: 'low',
+            label: 'Trending Down',
+            color: STOAColors.success
+        };
     }
     
     return {
@@ -936,7 +933,8 @@ function groupByMaterial(commodities) {
                 total: 0, 
                 items: [],
                 withValues: 0,
-                avgValue: 0
+                up: 0,
+                down: 0
             };
         }
         groups[material].count++;
@@ -945,13 +943,8 @@ function groupByMaterial(commodities) {
             groups[material].withValues++;
             groups[material].items.push(c);
         }
-    });
-    
-    // Calculate averages
-    Object.keys(groups).forEach(material => {
-        if (groups[material].withValues > 0) {
-            groups[material].avgValue = groups[material].total / groups[material].withValues;
-        }
+        if (c.trend && c.trend.direction === 'up') groups[material].up++;
+        if (c.trend && c.trend.direction === 'down') groups[material].down++;
     });
     
     return groups;
@@ -1021,20 +1014,33 @@ function calculatePriceRanges(commodities) {
 
 /**
  * Calculate trend analysis across all commodities
+ * Returns useful KPIs: up/down counts, top gainer/decliner, alerts
  * 
  * @param {Array} commodities - Commodities array
  * @returns {Object} Trend analysis
  */
 function calculateTrendAnalysis(commodities) {
     const withTrends = commodities.filter(c => c.trend && c.trend.direction !== 'neutral');
-    const upTrends = withTrends.filter(c => c.trend.direction === 'up').length;
-    const downTrends = withTrends.filter(c => c.trend.direction === 'down').length;
+    const upTrends = withTrends.filter(c => c.trend.direction === 'up');
+    const downTrends = withTrends.filter(c => c.trend.direction === 'down');
+    
+    const topGainer = upTrends.length > 0
+        ? upTrends.reduce((a, b) => (Math.abs(a.trend?.percentage || 0) >= Math.abs(b.trend?.percentage || 0) ? a : b))
+        : null;
+    const topDecliner = downTrends.length > 0
+        ? downTrends.reduce((a, b) => (Math.abs(a.trend?.percentage || 0) >= Math.abs(b.trend?.percentage || 0) ? a : b))
+        : null;
+    
+    const alertCount = commodities.filter(c => c.alerts && c.alerts.length > 0).length;
     
     return {
-        up: upTrends,
-        down: downTrends,
-        neutral: commodities.length - upTrends - downTrends,
-        total: commodities.length
+        up: upTrends.length,
+        down: downTrends.length,
+        neutral: commodities.length - upTrends.length - downTrends.length,
+        total: commodities.length,
+        topGainer: topGainer ? { product: topGainer.product, pct: topGainer.trend?.percentage || 0 } : null,
+        topDecliner: topDecliner ? { product: topDecliner.product, pct: topDecliner.trend?.percentage || 0 } : null,
+        alertCount
     };
 }
 
@@ -1379,7 +1385,8 @@ function renderMetrics() {
     if (!analytics) return;
     
     const totalEl = document.getElementById('totalCommodities');
-    const avgChangeEl = document.getElementById('avgChange');
+    const trendSummaryEl = document.getElementById('trendSummary');
+    const trendDetailEl = document.getElementById('trendDetail');
     const lastUpdatedEl = document.getElementById('lastUpdated');
     const updateSourceEl = document.getElementById('updateSource');
     
@@ -1387,8 +1394,15 @@ function renderMetrics() {
         totalEl.textContent = analytics.total;
     }
     
-    if (avgChangeEl) {
-        avgChangeEl.textContent = formatCurrency(analytics.avgValue);
+    if (trendSummaryEl && trendDetailEl && analytics.trends) {
+        const t = analytics.trends;
+        const net = t.up - t.down;
+        trendSummaryEl.innerHTML = `<span class="trend-up">↑ ${t.up}</span> <span class="trend-down">↓ ${t.down}</span>`;
+        let detail = '';
+        if (t.topGainer) detail += `${t.topGainer.product} +${t.topGainer.pct}%`;
+        if (t.topDecliner) detail += (detail ? ' · ' : '') + `${t.topDecliner.product} ${t.topDecliner.pct}%`;
+        if (t.alertCount > 0) detail += (detail ? ' · ' : '') + `${t.alertCount} alert${t.alertCount > 1 ? 's' : ''}`;
+        trendDetailEl.textContent = detail || (net > 0 ? 'More up than down' : net < 0 ? 'More down than up' : 'Mixed trends');
     }
     
     if (lastUpdatedEl) {
@@ -1431,10 +1445,10 @@ function renderBreakdown() {
                     <span class="stat-label">With Data</span>
                     <span class="stat-value">${data.withValues}</span>
                 </div>
-                ${data.withValues > 0 ? `
-                    <div class="stat-item">
-                        <span class="stat-label">Avg Price</span>
-                        <span class="stat-value">${formatCurrency(data.avgValue)}</span>
+                ${(data.up || data.down) ? `
+                    <div class="stat-item breakdown-trends">
+                        <span class="trend-up">↑ ${data.up || 0}</span>
+                        <span class="trend-down">↓ ${data.down || 0}</span>
                     </div>
                 ` : ''}
             </div>
@@ -2741,22 +2755,11 @@ function isSignificantMover(commodity) {
         }
     }
     
-    // Check for extreme values compared to average (>= 100% deviation - much stricter)
-    if (AppState.analytics && AppState.analytics.avgValue > 0) {
-        const avgValue = AppState.analytics.avgValue;
-        const deviation = Math.abs((commodity.value - avgValue) / avgValue);
-        if (deviation >= 1.0) { // 100% or more deviation from average
-            criteriaMet++;
-        }
-    }
-    
     // Require at least 2 criteria to be met, OR one very strong criterion
-    // Very strong: 15%+ change, high severity alert, or 100%+ deviation
+    // Very strong: 15%+ change, high severity alert
     const hasVeryStrongCriterion = 
         (commodity.trend && Math.abs(commodity.trend.percentage || 0) >= 15) ||
-        (commodity.alerts && commodity.alerts.some(a => a.severity === 'high')) ||
-        (AppState.analytics && AppState.analytics.avgValue > 0 && 
-         Math.abs((commodity.value - AppState.analytics.avgValue) / AppState.analytics.avgValue) >= 1.0);
+        (commodity.alerts && commodity.alerts.some(a => a.severity === 'high'));
     
     return hasVeryStrongCriterion || criteriaMet >= 2;
 }

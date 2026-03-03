@@ -1768,6 +1768,9 @@
   .metric-value.small {
     font-size: clamp(16px, 3.5vw, 20px);
   }
+
+  .metric-value .trend-up { color: var(--success, #4caf50); font-weight: 600; }
+  .metric-value .trend-down { color: var(--error, #f44336); font-weight: 600; }
   
   .metric-change {
     font-size: clamp(12px, 2.5vw, 13px);
@@ -2552,7 +2555,17 @@
     display: flex;
     gap: clamp(16px, 3vw, 20px);
     margin-bottom: clamp(12px, 2.5vw, 16px);
+    flex-wrap: wrap;
   }
+
+  .breakdown-trends {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .breakdown-card .trend-up { color: var(--success, #4caf50); font-weight: 600; }
+  .breakdown-card .trend-down { color: var(--error, #f44336); font-weight: 600; }
   
   .stat-item {
     flex: 1;
