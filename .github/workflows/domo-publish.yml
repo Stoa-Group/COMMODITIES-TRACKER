@@ -29,26 +29,37 @@ jobs:
       - name: Validate Domo credentials
         env:
           DOMO_INSTANCE: ${{ secrets.DOMO_INSTANCE }}
+          DOMO_HOST: ${{ secrets.DOMO_HOST }}
+          DOMO_DOMAIN: ${{ secrets.DOMO_DOMAIN }}
           DOMO_TOKEN: ${{ secrets.DOMO_TOKEN }}
+          DOMO_DEV_TOKEN: ${{ secrets.DOMO_DEV_TOKEN }}
+          DOMO_DEVELOPER_TOKEN: ${{ secrets.DOMO_DEVELOPER_TOKEN }}
+          DOMO_ACCESS_TOKEN: ${{ secrets.DOMO_ACCESS_TOKEN }}
         run: |
-          if [ -z "$DOMO_INSTANCE" ]; then
-            echo "Missing DOMO_INSTANCE secret (example: company.domo.com)."
+          INSTANCE="${DOMO_INSTANCE:-${DOMO_HOST:-${DOMO_DOMAIN:-}}}"
+          TOKEN="${DOMO_TOKEN:-${DOMO_DEV_TOKEN:-${DOMO_DEVELOPER_TOKEN:-${DOMO_ACCESS_TOKEN:-}}}}"
+
+          if [ -z "$INSTANCE" ]; then
+            echo "Missing Domo instance secret. Set one of: DOMO_INSTANCE, DOMO_HOST, DOMO_DOMAIN."
             exit 1
           fi
-          if [ -z "$DOMO_TOKEN" ]; then
-            echo "Missing DOMO_TOKEN secret. Use a Domo Developer Token from Admin > Authentication."
+          if [ -z "$TOKEN" ]; then
+            echo "Missing Domo token secret. Set one of: DOMO_TOKEN, DOMO_DEV_TOKEN, DOMO_DEVELOPER_TOKEN, DOMO_ACCESS_TOKEN."
+            echo "Use a Domo Developer Token from Admin > Authentication."
             exit 1
           fi
+
           # Normalize shorthand instance values to a valid hostname for non-interactive CLI login.
-          if [[ "$DOMO_INSTANCE" != *.* ]]; then
-            DOMO_INSTANCE="${DOMO_INSTANCE}.domo.com"
+          if [[ "$INSTANCE" != *.* ]]; then
+            INSTANCE="${INSTANCE}.domo.com"
           fi
-          echo "DOMO_INSTANCE=$DOMO_INSTANCE" >> "$GITHUB_ENV"
+          echo "DOMO_INSTANCE=$INSTANCE" >> "$GITHUB_ENV"
+          echo "DOMO_TOKEN=$TOKEN" >> "$GITHUB_ENV"
 
       - name: Login to Domo
         env:
           DOMO_INSTANCE: ${{ env.DOMO_INSTANCE }}
-          DOMO_TOKEN: ${{ secrets.DOMO_TOKEN }}
+          DOMO_TOKEN: ${{ env.DOMO_TOKEN }}
         run: domo login --token-only -i "$DOMO_INSTANCE" -t "$DOMO_TOKEN"
 
       - name: Publish to Domo
