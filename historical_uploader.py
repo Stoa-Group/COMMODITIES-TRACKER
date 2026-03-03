@@ -164,13 +164,19 @@ def push_to_stoagroup(payload, dry_run=False):
             if r.status_code in (200, 201):
                 total += len(chunk)
             else:
-                print(f"[ERROR] Ingest batch failed: {r.status_code} {r.text[:300]}")
+                try:
+                    err_body = r.json()
+                    detail = err_body.get("detail", err_body.get("error", r.text[:300]))
+                except Exception:
+                    detail = r.text[:300]
+                print(f"[ERROR] Ingest batch failed: {r.status_code} {detail}")
                 if r.status_code == 404:
-                    print("[HINT] 404 = commodities route not found. Ensure stoagroupDB API is deployed "
-                          "with commodities routes and STOAGROUP_API_URL is the base only (no /api suffix).")
+                    print("[HINT] 404 = commodities route not found. Ensure stoagroupDB API is deployed.")
                 elif r.status_code == 500:
-                    print("[HINT] 500 = server error. Usually means the commodities schema is missing. "
-                          "Run schema/create_commodities_schema.sql on your production database (Azure/SSMS).")
+                    if "Invalid object name" in str(detail) or "commodities" in str(detail).lower():
+                        print("[HINT] Schema missing. Run schema/create_commodities_schema.sql on production DB.")
+                    else:
+                        print("[HINT] Check Render logs for full error. Run schema if not done.")
                 return False, total
         except Exception as e:
             print(f"[ERROR] Ingest failed: {e}")

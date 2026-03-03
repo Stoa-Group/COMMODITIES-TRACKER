@@ -6,11 +6,16 @@ If the backfill fails with **500** and `{"error":"Failed to ingest commodities d
 
 **Most likely cause:** The commodities schema has not been run on the production database.
 
-**Fix:** Run `schema/create_commodities_schema.sql` on your production database:
-- Azure Portal → Query editor (or connect via SSMS)
-- Execute the script from `stoagroupDB/schema/create_commodities_schema.sql`
+**Fix:**
 
-This creates the `commodities` schema and `commodities.CommodityPrice` table. Then re-run the backfill.
+1. **Run the schema** on the same database Render uses (same as your API's DB_* env vars):
+   ```bash
+   cd stoagroupDB/api
+   npm run db:run-migration -- ../schema/create_commodities_schema.sql
+   ```
+   Or run the SQL manually in Azure Portal Query editor / SSMS.
+
+2. **Ensure the latest API is deployed** on Render (includes temp-table connection fix). Push stoagroupDB and let Render auto-deploy, or trigger Manual Deploy.
 
 ---
 
