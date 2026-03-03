@@ -27,6 +27,7 @@ def get_env_var(key, default=None):
 FRED_API_KEY = get_env_var("FRED_API_KEY")
 STOAGROUP_API_URL = get_env_var("STOAGROUP_API_URL", "").rstrip("/")
 COMMODITIES_INGEST_KEY = get_env_var("COMMODITIES_INGEST_KEY")
+ALLOW_INGEST_FAILURE = str(get_env_var("ALLOW_INGEST_FAILURE", "false")).lower() in ("1", "true", "yes", "y")
 
 # Validation
 if not FRED_API_KEY:
@@ -91,7 +92,7 @@ FRED_SERIES = [
     ("EXHOSINVMW", "housing", "Inventory", "Existing Homes for Sale - Midwest", "Thousands"),
     ("EXHOSINVS", "housing", "Inventory", "Existing Homes for Sale - South", "Thousands"),
     ("EXHOSINVW", "housing", "Inventory", "Existing Homes for Sale - West", "Thousands"),
-    ("MSACSR", "housing", "Inventory", "Months' Supply of New Houses", "Months"),
+    ("MSACSR", "housing", "Inventory", "Months Supply of New Houses", "Months"),
     # Housing - Prices & Rates
     ("MSPN", "housing", "Prices", "Median Price - New Houses", "USD"),
     ("HOSMEDUSM052N", "housing", "Prices", "Median Price - Existing Houses", "USD"),
@@ -191,7 +192,10 @@ def main():
     success = push_to_stoagroup(payload)
     if not success and payload and STOAGROUP_API_URL:
         print("[WARNING] Data collected but push failed. Check STOAGROUP_API_URL and COMMODITIES_INGEST_KEY.")
-        exit(1)
+        if ALLOW_INGEST_FAILURE:
+            print("[WARNING] ALLOW_INGEST_FAILURE is enabled; finishing run without failing workflow.")
+        else:
+            exit(1)
     if not payload:
         print("[ERROR] No data collected. Check FRED_API_KEY.")
         exit(1)

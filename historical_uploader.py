@@ -80,7 +80,7 @@ FRED_SERIES = [
     ("EXHOSINVMW", "housing", "Inventory", "Existing Homes for Sale - Midwest", "Thousands"),
     ("EXHOSINVS", "housing", "Inventory", "Existing Homes for Sale - South", "Thousands"),
     ("EXHOSINVW", "housing", "Inventory", "Existing Homes for Sale - West", "Thousands"),
-    ("MSACSR", "housing", "Inventory", "Months' Supply of New Houses", "Months"),
+    ("MSACSR", "housing", "Inventory", "Months Supply of New Houses", "Months"),
     ("MSPN", "housing", "Prices", "Median Price - New Houses", "USD"),
     ("HOSMEDUSM052N", "housing", "Prices", "Median Price - Existing Houses", "USD"),
     ("MORTGAGE30US", "housing", "Mortgage Rates", "30-Year Fixed Mortgage Rate", "Percent"),
