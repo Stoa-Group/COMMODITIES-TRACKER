@@ -4,9 +4,10 @@
 
 1. **Start the stoagroupDB API** (serves data from your local DB):
    ```bash
-   cd stoagroupDB/api && npm run dev
+   cd stoagroupDB/api
+   npm run dev
    ```
-   API runs on http://localhost:3000 (or PORT from .env).
+   API runs on http://localhost:3002 (default). The dashboard auto-connects to it when served from localhost.
 
 2. **Start the dashboard**:
    ```bash
@@ -15,7 +16,7 @@
    ```
    Open http://localhost:5500 in your browser.
 
-3. **Data source**: When served from localhost, the dashboard automatically uses `http://localhost:3000` as the API URL. No config needed.
+3. **Data source**: When served from localhost, the dashboard automatically uses `http://localhost:3002` as the API URL. No config needed. No Domo datasets required.
 
 ## Override API URL
 
@@ -32,4 +33,4 @@ cd "commodities tracker"
 .venv/bin/python commodities_tracker.py
 ```
 
-For local API, set `STOAGROUP_API_URL=http://localhost:3000` in `.env`.
+For local API, set `STOAGROUP_API_URL=http://localhost:3002` in `.env`.
